@@ -1,0 +1,14 @@
+############################################################################
+## Changes #################################################################
+############################################################################
+
+JSON-Path
+=========
+
+Created:      2010-07-28
+Home page:    <http://search.cpan.org/dist/JSON-Path/>
+Bug tracker:  <http://rt.cpan.org/Dist/Display.html?Queue=JSON-Path>
+Maintainer:   Toby Inkster <mailto:tobyink@cpan.org>
+
+0.080_00 [2010-07-28] # Ported from PHP.
+

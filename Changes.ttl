@@ -1,0 +1,62 @@
+#############################################################
+
+@prefix :        <http://usefulinc.com/ns/doap#> .
+@prefix dcs:     <http://ontologi.es/doap-changeset#> .
+@prefix dc:      <http://purl.org/dc/terms/> .
+@prefix foaf:    <http://xmlns.com/foaf/0.1/> .
+@prefix my:      <http://purl.org/NET/cpan-uri/dist/JSON-Path/> .
+@prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix toby:    <http://tobyinkster.co.uk/#> .
+@prefix xsd:     <http://www.w3.org/2001/XMLSchema#> .
+
+#############################################################
+
+<>
+
+	dc:title         "Changes" ;
+	dc:description   "Revision history for Perl extension JSON::Path."@en ;
+	dc:subject       my:project ;
+	dc:creator       toby:i .
+
+#############################################################
+
+my:v_0-080_00
+
+	a               :Version ;
+	dc:issued       "2010-07-28"^^xsd:date ;
+	:revision       "0.080_00"^^xsd:string ;
+	:file-release   <http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.080_00.tar.gz> ;
+	rdfs:label      "Ported from PHP."@en .
+
+#############################################################
+
+my:project
+
+	a               :Project ;
+	:name           "JSON-Path" ;
+	:shortdesc      "search nested hashref/arrayref structures using JSONPath"@en ;
+	:programming-language  "Perl" ;
+	:homepage       <http://search.cpan.org/dist/JSON-Path/> ;
+	:download-page  <http://search.cpan.org/dist/JSON-Path/> ;
+	:bug-database   <http://rt.cpan.org/Dist/Display.html?Queue=JSON-Path> ;
+	:repository     [ a :SVNRepository ; :browse <http://goddamn.co.uk/viewvc/perlmods/JSON-Path/> ] ;
+	:maintainer     toby:i ;
+	:developer      toby:i ;
+	:documenter     toby:i ;
+	:tester         toby:i ;
+	:created        "2010-07-28"^^xsd:date ;
+	:license        <http://dev.perl.org/licenses/> ;
+	:release        my:v_0-080_00 .
+
+#############################################################
+
+toby:i
+
+	a               foaf:Person ;
+	foaf:name       "Toby Inkster" ;
+	foaf:homepage   <http://tobyinkster.co.uk/> ;
+	foaf:page       <http://search.cpan.org/~tobyink/> ;
+	foaf:mbox       <mailto:tobyink@cpan.org> ;
+	<http://www.w3.org/2002/07/owl#sameAs> <http://purl.org/NET/cpan-uri/person/tobyink> .
+
+#############################################################

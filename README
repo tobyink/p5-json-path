@@ -1,0 +1,146 @@
+NAME
+    JSON::Path - search nested hashref/arrayref structures using JSONPath
+
+SYNOPSIS
+     my $data = {
+      "store" => {
+        "book" => [ 
+          { "category" =>  "reference",
+            "author"   =>  "Nigel Rees",
+            "title"    =>  "Sayings of the Century",
+            "price"    =>  8.95,
+          },
+          { "category" =>  "fiction",
+            "author"   =>  "Evelyn Waugh",
+            "title"    =>  "Sword of Honour",
+            "price"    =>  12.99,
+          },
+          { "category" =>  "fiction",
+            "author"   =>  "Herman Melville",
+            "title"    =>  "Moby Dick",
+            "isbn"     =>  "0-553-21311-3",
+            "price"    =>  8.99,
+          },
+          { "category" =>  "fiction",
+            "author"   =>  "J. R. R. Tolkien",
+            "title"    =>  "The Lord of the Rings",
+            "isbn"     =>  "0-395-19395-8",
+            "price"    =>  22.99,
+          },
+        ],
+        "bicycle" => [
+          { "color": "red",
+            "price": 19.95,
+          },
+        ],
+      },
+     };
+ 
+     # All authors of books in the store
+     my $jpath   = JSON::Path->new('$.store.book[*].author');
+     my @authors = $jpath->values($data);
+ 
+     # The author of the last (by order) book
+     my $jpath     = JSON::Path->new('$..book[-1:]');
+     my ($tolkien) = $jpath->values($data);
+
+DESCRIPTION
+    This module implements JSONPath, an XPath-like language for searching
+    JSON-like structures.
+
+    JSONPath is described at <http://goessner.net/articles/JsonPath/>.
+
+  Constructor
+    "JSON::Path->new($string)"
+        Given a JSONPath expression $string, returns a JSON::Path object.
+
+  Methods
+    "values($object)"
+        Evaluates the JSONPath expression against an object. The object
+        $object can be either a nested Perl hashref/arrayref structure, or a
+        JSON string capable of being decoded by JSON::from_json.
+
+        Returns a list of structures from within $object which match against
+        the JSONPath expression.
+
+        This method will sometimes throw an error using the Error module.
+
+    "paths($object)"
+        As per "values" but instead of returning structures which match the
+        expression, returns paths that point towards those structures.
+
+    "to_string"
+        Returns the original JSONPath expression as a string.
+
+        This method is usually not needed, as the JSON::Path should
+        automatically stringify itself as appropriate. i.e. the following
+        works:
+
+         my $jpath = JSON::Path->new('$.store.book[*].author');
+         print "I'm looking for: " . $jpath . "\n";
+
+  JSONPath Embedded Perl Expressions
+    JSONPath expressions may contain subexpressions that are evaluated using
+    the native host language. e.g.
+
+     $..book[?($_->{author} =~ /tolkien/i)]
+
+    The stuff between "?(" and ")" is a Perl expression that must return a
+    boolean, used to filter results. As arbitrary Perl may be used, this is
+    clearly quite dangerous unless used in a controlled environment. Thus,
+    it's disabled by default. To enable, set:
+
+     $JSON::Path::Safe = 0;
+
+    There are some differences between the JSONPath spec and this
+    implementation.
+
+    *   JSONPath uses a variable '$' to refer to the root node. This is not
+        a legal variable name in Perl, so '$root' is used instead.
+
+    *   JSONPath uses a variable '@' to refer to the current node. This is
+        not a legal variable name in Perl, so '$_' is used instead.
+
+BUGS
+    Please report any bugs to <http://rt.cpan.org/>.
+
+SEE ALSO
+    Specification: <http://goessner.net/articles/JsonPath/>.
+
+    Implementations in PHP, Javascript and C#:
+    <http://code.google.com/p/jsonpath/>.
+
+    Related modules: JSON, JSON::T.
+
+AUTHOR
+    Toby Inkster <tobyink@cpan.org>.
+
+    This module is pretty much a straight line-by-line port of the PHP
+    JSONPath implementation (version 0.8.x) by Stefan Goessner. See
+    <http://code.google.com/p/jsonpath/>.
+
+COPYRIGHT AND LICENCE
+    Copyright 2007 Stefan Goessner.
+
+    Copyright 2010 Toby Inkster.
+
+  a.k.a. "The MIT Licence"
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the
+    "Software"), to deal in the Software without restriction, including
+    without limitation the rights to use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to
+    the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+    OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
