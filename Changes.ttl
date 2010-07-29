@@ -28,6 +28,17 @@ my:v_0-080_00
 	:file-release   <http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.080_00.tar.gz> ;
 	rdfs:label      "Ported from PHP."@en .
 
+my:v_0-080_01
+
+	a               :Version ;
+	dc:issued       "2010-07-29"^^xsd:date ;
+	:revision       "0.080_01"^^xsd:string ;
+	:file-release   <http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.080_01.tar.gz> ;
+	dcs:changeset [
+		dcs:versus my:v_0-080_00 ;
+		dcs:item   [ rdfs:label "Fix license metadata in distribution."@en ; a dcs:Bugfix ]
+		] .
+
 #############################################################
 
 my:project
@@ -45,8 +56,8 @@ my:project
 	:documenter     toby:i ;
 	:tester         toby:i ;
 	:created        "2010-07-28"^^xsd:date ;
-	:license        <http://dev.perl.org/licenses/> ;
-	:release        my:v_0-080_00 .
+	:license        <http://opensource.org/licenses/mit-license.php> ;
+	:release        my:v_0-080_00 , my:v_0-080_01 .
 
 #############################################################
 

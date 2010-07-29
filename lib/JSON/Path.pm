@@ -4,7 +4,7 @@ use 5.008;
 use common::sense;
 use overload '""' => \&to_string;
 
-our $VERSION = '0.080_00';
+our $VERSION = '0.080_01';
 our $Safe    = 1;
 
 use Error qw[:try];

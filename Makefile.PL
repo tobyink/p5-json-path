@@ -12,7 +12,7 @@ version_from        $fn;
 abstract_from       $fn;
 readme_from         $fn;
 author              'Toby Inkster <tobyink@cpan.org>';
-license             'perl';
+license             'mit';
 
 requires            'common::sense'      => 0;
 requires            'Error'              => 0;
