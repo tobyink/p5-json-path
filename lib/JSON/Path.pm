@@ -4,7 +4,7 @@ use 5.008;
 use common::sense;
 use overload '""' => \&to_string;
 
-our $VERSION = '0.080_01';
+our $VERSION = '0.080_02';
 our $Safe    = 1;
 
 use Error qw[:try];
@@ -439,6 +439,12 @@ Implementations in PHP, Javascript and C#:
 L<http://code.google.com/p/jsonpath/>.
 
 Related modules: L<JSON>, L<JSON::T>.
+
+Similar functionality: L<Data::Path>, L<Data::DPath>, L<Data::SPath>,
+L<Hash::Path>, L<Path::Resolver::Resolver::Hash>, L<Data::Nested>,
+L<Data::Hierarchy>... yes, the idea's not especially new. What's different
+is that JSON::Path uses a vaguely standardised syntax with implementations
+in at least three other programming languages.
 
 =head1 AUTHOR
 
