@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:dbug="http://ontologi.es/doap-bugs#" xmlns:dc="http://purl.org/dc/terms/" xmlns:dcs="http://ontologi.es/doap-changeset#" xmlns:doap="http://usefulinc.com/ns/doap#" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
-<rdf:Description rdf:nodeID="r2F1444D89A7E11DFA5FDD8027C87BD8Dr0">
+<rdf:Description rdf:nodeID="rE3366D7E9AF611DF97F6A064F87153EBr0">
+	<dcs:item rdf:nodeID="rE3366D7E9AF611DF97F6A064F87153EBr1"/>
+	<dcs:versus rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_00"/>
+</rdf:Description>
+<rdf:Description rdf:nodeID="rE3366D7E9AF611DF97F6A064F87153EBr1">
+	<rdf:type rdf:resource="http://ontologi.es/doap-changeset#Bugfix"/>
+	<rdfs:label xml:lang="en">Fix license metadata in distribution.</rdfs:label>
+</rdf:Description>
+<rdf:Description rdf:nodeID="rE3366D7E9AF611DF97F6A064F87153EBr2">
 	<doap:browse rdf:resource="http://goddamn.co.uk/viewvc/perlmods/JSON-Path/"/>
 	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#SVNRepository"/>
 </rdf:Description>
@@ -17,12 +25,13 @@
 	<doap:documenter rdf:resource="http://tobyinkster.co.uk/#i"/>
 	<doap:download-page rdf:resource="http://search.cpan.org/dist/JSON-Path/"/>
 	<doap:homepage rdf:resource="http://search.cpan.org/dist/JSON-Path/"/>
-	<doap:license rdf:resource="http://dev.perl.org/licenses/"/>
+	<doap:license rdf:resource="http://opensource.org/licenses/mit-license.php"/>
 	<doap:maintainer rdf:resource="http://tobyinkster.co.uk/#i"/>
 	<doap:name>JSON-Path</doap:name>
 	<doap:programming-language>Perl</doap:programming-language>
 	<doap:release rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_00"/>
-	<doap:repository rdf:nodeID="r2F1444D89A7E11DFA5FDD8027C87BD8Dr0"/>
+	<doap:release rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_01"/>
+	<doap:repository rdf:nodeID="rE3366D7E9AF611DF97F6A064F87153EBr2"/>
 	<doap:shortdesc xml:lang="en">search nested hashref/arrayref structures using JSONPath</doap:shortdesc>
 	<doap:tester rdf:resource="http://tobyinkster.co.uk/#i"/>
 	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#Project"/>
@@ -33,6 +42,13 @@
 	<doap:revision rdf:datatype="http://www.w3.org/2001/XMLSchema#string">0.080_00</doap:revision>
 	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#Version"/>
 	<rdfs:label xml:lang="en">Ported from PHP.</rdfs:label>
+</rdf:Description>
+<rdf:Description rdf:about="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_01">
+	<dcs:changeset rdf:nodeID="rE3366D7E9AF611DF97F6A064F87153EBr0"/>
+	<dc:issued rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2010-07-29</dc:issued>
+	<doap:file-release rdf:resource="http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.080_01.tar.gz"/>
+	<doap:revision rdf:datatype="http://www.w3.org/2001/XMLSchema#string">0.080_01</doap:revision>
+	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#Version"/>
 </rdf:Description>
 <rdf:Description xmlns:ns1="http://www.w3.org/2002/07/owl#" rdf:about="http://tobyinkster.co.uk/#i">
 	<rdf:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
