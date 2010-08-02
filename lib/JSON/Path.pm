@@ -4,7 +4,7 @@ use 5.008;
 use common::sense;
 use overload '""' => \&to_string;
 
-our $VERSION = '0.080_02';
+our $VERSION = '0.080';
 our $Safe    = 1;
 
 use Error qw[:try];
@@ -65,6 +65,8 @@ use common::sense;
 
 use Error qw[:try];
 use Scalar::Util qw[looks_like_number];
+
+our $VERSION = '0.080';
 
 sub new
 {
@@ -438,7 +440,8 @@ Specification: L<http://goessner.net/articles/JsonPath/>.
 Implementations in PHP, Javascript and C#:
 L<http://code.google.com/p/jsonpath/>.
 
-Related modules: L<JSON>, L<JSON::T>.
+Related modules: L<JSON>, L<JSON::T>, L<JSON::GRDDL>,
+L<JSON::Hyper>, L<JSON::Schema>.
 
 Similar functionality: L<Data::Path>, L<Data::DPath>, L<Data::SPath>,
 L<Hash::Path>, L<Path::Resolver::Resolver::Hash>, L<Data::Nested>,
@@ -459,6 +462,10 @@ See L<http://code.google.com/p/jsonpath/>.
 Copyright 2007 Stefan Goessner.
 
 Copyright 2010 Toby Inkster.
+
+This module is tri-licensed. It is available under the X11 (a.k.a. MIT)
+licence; you can also redistribute it and/or modify it under the same
+terms as Perl itself.
 
 =head2 a.k.a. "The MIT Licence"
 

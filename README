@@ -110,7 +110,13 @@ SEE ALSO
     Implementations in PHP, Javascript and C#:
     <http://code.google.com/p/jsonpath/>.
 
-    Related modules: JSON, JSON::T.
+    Related modules: JSON, JSON::T, JSON::GRDDL, JSON::Hyper, JSON::Schema.
+
+    Similar functionality: Data::Path, Data::DPath, Data::SPath, Hash::Path,
+    Path::Resolver::Resolver::Hash, Data::Nested, Data::Hierarchy... yes,
+    the idea's not especially new. What's different is that JSON::Path uses
+    a vaguely standardised syntax with implementations in at least three
+    other programming languages.
 
 AUTHOR
     Toby Inkster <tobyink@cpan.org>.
@@ -123,6 +129,10 @@ COPYRIGHT AND LICENCE
     Copyright 2007 Stefan Goessner.
 
     Copyright 2010 Toby Inkster.
+
+    This module is tri-licensed. It is available under the X11 (a.k.a. MIT)
+    licence; you can also redistribute it and/or modify it under the same
+    terms as Perl itself.
 
   a.k.a. "The MIT Licence"
     Permission is hereby granted, free of charge, to any person obtaining a
