@@ -1,9 +1,11 @@
 use 5.010;
 use lib "lib";
-use JSON;
+use lib "../JSON-JOM/lib";
+use JSON::JOM qw[from_json to_json uplift];
 use JSON::Path;
+use Scalar::Util qw[blessed];
 
-my $object = from_json(<<'JSON');
+my $object = uplift(from_json(<<'JSON'));
 { "store": {
     "book": [ 
       { "category": "reference",
@@ -44,7 +46,9 @@ foreach ('$.store.book[0].title', '$.store.book[*].author', '$..author', '$..boo
 {
 	my $jpath = JSON::Path->new($_);
 	say $jpath;
-	print to_json([$jpath->values($object)], {pretty=>1});
-	print to_json([$jpath->paths($object)], {pretty=>1});
+	say to_json([$jpath->values($object)], {pretty=>1});
+	say to_json([$jpath->paths($object)], {pretty=>1});
+	say [$jpath->values($object)]->[0]->nodePath
+		if blessed([$jpath->values($object)]->[0]);
 	say '-' x 40; 
 }
