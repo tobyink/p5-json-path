@@ -39,6 +39,18 @@ my:v_0-080_01
 		dcs:item   [ rdfs:label "Fix license metadata in distribution."@en ; a dcs:Bugfix ]
 		] .
 
+my:v_0-100
+
+	a               :Version ;
+	dc:issued       "2010-08-25"^^xsd:date ;
+	:revision       "0.100"^^xsd:string ;
+	:file-release   <http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.100.tar.gz> ;
+	dcs:changeset [
+		dcs:versus my:v_0-080_01 ;
+		dcs:item   [ rdfs:label "Support for JSON::JOM."@en ; a dcs:Update ] ;
+		dcs:item   [ rdfs:label "Minor documentation improvements."@en ] ;
+		] .
+
 #############################################################
 
 my:project
@@ -57,7 +69,7 @@ my:project
 	:tester         toby:i ;
 	:created        "2010-07-28"^^xsd:date ;
 	:license        <http://opensource.org/licenses/mit-license.php> ;
-	:release        my:v_0-080_00 , my:v_0-080_01 .
+	:release        my:v_0-080_00 , my:v_0-080_01 , my:v_0-100 .
 
 #############################################################
 

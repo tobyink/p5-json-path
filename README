@@ -50,6 +50,8 @@ DESCRIPTION
 
     JSONPath is described at <http://goessner.net/articles/JsonPath/>.
 
+    This module is JSON::JOM-compatible.
+
   Constructor
     "JSON::Path->new($string)"
         Given a JSONPath expression $string, returns a JSON::Path object.
@@ -79,6 +81,11 @@ DESCRIPTION
          my $jpath = JSON::Path->new('$.store.book[*].author');
          print "I'm looking for: " . $jpath . "\n";
 
+PERL SPECIFICS
+    JSONPath is intended as a cross-programming-language method of searching
+    nested object structures. There are however, some things you need to
+    think about when using JSONPath in Perl...
+
   JSONPath Embedded Perl Expressions
     JSONPath expressions may contain subexpressions that are evaluated using
     the native host language. e.g.
@@ -101,6 +108,17 @@ DESCRIPTION
     *   JSONPath uses a variable '@' to refer to the current node. This is
         not a legal variable name in Perl, so '$_' is used instead.
 
+  Blessed Objects
+    Blessed objects are generally treated as atomic values; JSON::Path will
+    not follow paths inside them. The exception to this rule are blessed
+    objects where:
+
+      Scalar::Util::blessed($object)
+      && $object->can('typeof')
+      && $object->typeof =~ /^(ARRAY|HASH)$/
+
+    which are treated as an unblessed arrayref or hashref appropriately.
+
 BUGS
     Please report any bugs to <http://rt.cpan.org/>.
 
@@ -110,7 +128,8 @@ SEE ALSO
     Implementations in PHP, Javascript and C#:
     <http://code.google.com/p/jsonpath/>.
 
-    Related modules: JSON, JSON::T, JSON::GRDDL, JSON::Hyper, JSON::Schema.
+    Related modules: JSON, JSON::JOM, JSON::T, JSON::GRDDL, JSON::Hyper,
+    JSON::Schema.
 
     Similar functionality: Data::Path, Data::DPath, Data::SPath, Hash::Path,
     Path::Resolver::Resolver::Hash, Data::Nested, Data::Hierarchy... yes,

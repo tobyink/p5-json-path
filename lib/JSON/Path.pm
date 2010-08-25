@@ -4,7 +4,7 @@ use 5.008;
 use common::sense;
 use overload '""' => \&to_string;
 
-our $VERSION = '0.080';
+our $VERSION = '0.100';
 our $Safe    = 1;
 
 use Error qw[:try];
@@ -66,7 +66,7 @@ use common::sense;
 use Error qw[:try];
 use Scalar::Util qw[blessed];
 
-our $VERSION = '0.080';
+our $VERSION = '0.100';
 
 sub new
 {
@@ -374,6 +374,8 @@ JSON-like structures.
 
 JSONPath is described at L<http://goessner.net/articles/JsonPath/>.
 
+This module is JSON::JOM-compatible.
+
 =head2 Constructor
 
 =over 4
@@ -416,6 +418,12 @@ stringify itself as appropriate. i.e. the following works:
 
 =back
 
+=head1 PERL SPECIFICS
+
+JSONPath is intended as a cross-programming-language method of
+searching nested object structures. There are however, some things
+you need to think about when using JSONPath in Perl...
+
 =head2 JSONPath Embedded Perl Expressions
 
 JSONPath expressions may contain subexpressions that are evaluated
@@ -445,6 +453,18 @@ instead.
 
 =back
 
+=head2 Blessed Objects
+
+Blessed objects are generally treated as atomic values; JSON::Path
+will not follow paths inside them. The exception to this rule are blessed
+objects where:
+
+  Scalar::Util::blessed($object)
+  && $object->can('typeof')
+  && $object->typeof =~ /^(ARRAY|HASH)$/
+
+which are treated as an unblessed arrayref or hashref appropriately.
+
 =head1 BUGS
 
 Please report any bugs to L<http://rt.cpan.org/>.
@@ -456,7 +476,7 @@ Specification: L<http://goessner.net/articles/JsonPath/>.
 Implementations in PHP, Javascript and C#:
 L<http://code.google.com/p/jsonpath/>.
 
-Related modules: L<JSON>, L<JSON::T>, L<JSON::GRDDL>,
+Related modules: L<JSON>, L<JSON::JOM>, L<JSON::T>, L<JSON::GRDDL>,
 L<JSON::Hyper>, L<JSON::Schema>.
 
 Similar functionality: L<Data::Path>, L<Data::DPath>, L<Data::SPath>,
