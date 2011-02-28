@@ -1,3 +1,4 @@
+TODO
 Changes
 Changes.ttl
 Changes.xml
@@ -8,7 +9,6 @@ README
 META.yml
 SIGNATURE
 
-t/00sig.t
 t/01basic.t
 
 inc/Module/AutoInstall.pm
