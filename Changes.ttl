@@ -59,10 +59,10 @@ my:project
 	:name           "JSON-Path" ;
 	:shortdesc      "search nested hashref/arrayref structures using JSONPath"@en ;
 	:programming-language  "Perl" ;
-	:homepage       <http://search.cpan.org/dist/JSON-Path/> ;
-	:download-page  <http://search.cpan.org/dist/JSON-Path/> ;
+	:homepage       <https://metacpan.org/release/JSON-Path> ;
+	:download-page  <https://metacpan.org/release/JSON-Path> ;
 	:bug-database   <http://rt.cpan.org/Dist/Display.html?Queue=JSON-Path> ;
-	:repository     [ a :SVNRepository ; :browse <http://goddamn.co.uk/viewvc/perlmods/JSON-Path/> ] ;
+	:repository     [ a :SVNRepository ; :browse <http://goddamn.co.uk/svn-web/perlmods/browse/JSON-Path/> ] ;
 	:maintainer     toby:i ;
 	:developer      toby:i ;
 	:documenter     toby:i ;
@@ -78,7 +78,7 @@ toby:i
 	a               foaf:Person ;
 	foaf:name       "Toby Inkster" ;
 	foaf:homepage   <http://tobyinkster.co.uk/> ;
-	foaf:page       <http://search.cpan.org/~tobyink/> ;
+	foaf:page       <https://metacpan.org/author/TOBYINK> ;
 	foaf:mbox       <mailto:tobyink@cpan.org> ;
 	<http://www.w3.org/2002/07/owl#sameAs> <http://purl.org/NET/cpan-uri/person/tobyink> .
 
