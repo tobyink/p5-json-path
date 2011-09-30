@@ -1,27 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rdf:RDF xmlns:dbug="http://ontologi.es/doap-bugs#" xmlns:dc="http://purl.org/dc/terms/" xmlns:dcs="http://ontologi.es/doap-changeset#" xmlns:doap="http://usefulinc.com/ns/doap#" xmlns:foaf="http://xmlns.com/foaf/0.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#">
-<rdf:Description rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er0">
-	<dcs:item rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er1"/>
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er0">
+	<dcs:item rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er1"/>
 	<dcs:versus rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_00"/>
 </rdf:Description>
-<rdf:Description rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er1">
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er1">
 	<rdf:type rdf:resource="http://ontologi.es/doap-changeset#Bugfix"/>
 	<rdfs:label xml:lang="en">Fix license metadata in distribution.</rdfs:label>
 </rdf:Description>
-<rdf:Description rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er2">
-	<dcs:item rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er3"/>
-	<dcs:item rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er4"/>
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er2">
+	<dcs:item rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er3"/>
+	<dcs:item rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er4"/>
 	<dcs:versus rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_01"/>
 </rdf:Description>
-<rdf:Description rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er3">
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er3">
 	<rdf:type rdf:resource="http://ontologi.es/doap-changeset#Update"/>
 	<rdfs:label xml:lang="en">Support for JSON::JOM.</rdfs:label>
 </rdf:Description>
-<rdf:Description rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er4">
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er4">
 	<rdfs:label xml:lang="en">Minor documentation improvements.</rdfs:label>
 </rdf:Description>
-<rdf:Description rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er5">
-	<doap:browse rdf:resource="http://goddamn.co.uk/viewvc/perlmods/JSON-Path/"/>
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er5">
+	<dcs:item rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er6"/>
+	<dcs:item rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er7"/>
+	<dcs:versus rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-100"/>
+</rdf:Description>
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er6">
+	<rdf:type rdf:resource="http://ontologi.es/doap-changeset#Bugfix"/>
+	<rdfs:label xml:lang="en">Fix retrieval of zeroth array element.</rdfs:label>
+</rdf:Description>
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er7">
+	<rdf:type rdf:resource="http://ontologi.es/doap-changeset#Packaging"/>
+	<rdfs:label xml:lang="en">Add more test cases.</rdfs:label>
+</rdf:Description>
+<rdf:Description rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er8">
+	<doap:browse rdf:resource="http://goddamn.co.uk/svn-web/perlmods/browse/JSON-Path/"/>
 	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#SVNRepository"/>
 </rdf:Description>
 <rdf:Description rdf:about="file:///home/tai/src/perlmods/JSON-Path/Changes.ttl">
@@ -35,8 +48,8 @@
 	<doap:created rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2010-07-28</doap:created>
 	<doap:developer rdf:resource="http://tobyinkster.co.uk/#i"/>
 	<doap:documenter rdf:resource="http://tobyinkster.co.uk/#i"/>
-	<doap:download-page rdf:resource="http://search.cpan.org/dist/JSON-Path/"/>
-	<doap:homepage rdf:resource="http://search.cpan.org/dist/JSON-Path/"/>
+	<doap:download-page rdf:resource="https://metacpan.org/release/JSON-Path"/>
+	<doap:homepage rdf:resource="https://metacpan.org/release/JSON-Path"/>
 	<doap:license rdf:resource="http://opensource.org/licenses/mit-license.php"/>
 	<doap:maintainer rdf:resource="http://tobyinkster.co.uk/#i"/>
 	<doap:name>JSON-Path</doap:name>
@@ -44,7 +57,8 @@
 	<doap:release rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_00"/>
 	<doap:release rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_01"/>
 	<doap:release rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-100"/>
-	<doap:repository rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er5"/>
+	<doap:release rdf:resource="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-101"/>
+	<doap:repository rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er8"/>
 	<doap:shortdesc xml:lang="en">search nested hashref/arrayref structures using JSONPath</doap:shortdesc>
 	<doap:tester rdf:resource="http://tobyinkster.co.uk/#i"/>
 	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#Project"/>
@@ -57,17 +71,24 @@
 	<rdfs:label xml:lang="en">Ported from PHP.</rdfs:label>
 </rdf:Description>
 <rdf:Description rdf:about="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-080_01">
-	<dcs:changeset rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er0"/>
+	<dcs:changeset rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er0"/>
 	<dc:issued rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2010-07-29</dc:issued>
 	<doap:file-release rdf:resource="http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.080_01.tar.gz"/>
 	<doap:revision rdf:datatype="http://www.w3.org/2001/XMLSchema#string">0.080_01</doap:revision>
 	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#Version"/>
 </rdf:Description>
 <rdf:Description rdf:about="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-100">
-	<dcs:changeset rdf:nodeID="r9F9BE4FCB03D11DFBA27C59F71E8387Er2"/>
+	<dcs:changeset rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er2"/>
 	<dc:issued rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2010-08-25</dc:issued>
 	<doap:file-release rdf:resource="http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.100.tar.gz"/>
 	<doap:revision rdf:datatype="http://www.w3.org/2001/XMLSchema#string">0.100</doap:revision>
+	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#Version"/>
+</rdf:Description>
+<rdf:Description rdf:about="http://purl.org/NET/cpan-uri/dist/JSON-Path/v_0-101">
+	<dcs:changeset rdf:nodeID="rF3FEE226EAE611E0B3B6F40AF9AC504Er5"/>
+	<dc:issued rdf:datatype="http://www.w3.org/2001/XMLSchema#date">2011-09-29</dc:issued>
+	<doap:file-release rdf:resource="http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.101.tar.gz"/>
+	<doap:revision rdf:datatype="http://www.w3.org/2001/XMLSchema#string">0.101</doap:revision>
 	<rdf:type rdf:resource="http://usefulinc.com/ns/doap#Version"/>
 </rdf:Description>
 <rdf:Description xmlns:ns1="http://www.w3.org/2002/07/owl#" rdf:about="http://tobyinkster.co.uk/#i">
@@ -76,6 +97,6 @@
 	<foaf:homepage rdf:resource="http://tobyinkster.co.uk/"/>
 	<foaf:mbox rdf:resource="mailto:tobyink@cpan.org"/>
 	<foaf:name>Toby Inkster</foaf:name>
-	<foaf:page rdf:resource="http://search.cpan.org/~tobyink/"/>
+	<foaf:page rdf:resource="https://metacpan.org/author/TOBYINK"/>
 </rdf:Description>
 </rdf:RDF>

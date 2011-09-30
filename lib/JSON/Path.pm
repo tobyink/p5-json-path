@@ -4,7 +4,7 @@ use 5.008;
 use common::sense;
 use overload '""' => \&to_string;
 
-our $VERSION = '0.100';
+our $VERSION = '0.101';
 our $Safe    = 1;
 
 use Error qw[:try];
@@ -66,7 +66,7 @@ use common::sense;
 use Error qw[:try];
 use Scalar::Util qw[blessed];
 
-our $VERSION = '0.100';
+our $VERSION = '0.101';
 
 sub new
 {
@@ -129,7 +129,8 @@ sub trace
 {
 	my ($self, $expr, $val, $path) = @_;
 	
-	return $self->store($path, $val) unless $expr;
+	return $self->store($path, $val) if "$expr" eq '';
+	#return $self->store($path, $val) unless $expr;
 	
 	my ($loc, $x);
 	{
@@ -174,7 +175,7 @@ sub trace
 		# my $evalx = $self->evalx($loc, $val, substr($path, rindex($path,";")+1));
 		$self->walk($loc, $x, $val, $path, \&_callback_05);
 	}
-	elsif ($loc =~ /^(-?[0-9]*):(-?[0-9]*):?(-?[0-9]*)$/) # [start:end:step]  phyton slice syntax
+	elsif ($loc =~ /^(-?[0-9]*):(-?[0-9]*):?(-?[0-9]*)$/) # [start:end:step]  python slice syntax
 	{
 		$self->slice($loc, $x, $val, $path);
 	}
@@ -497,7 +498,7 @@ See L<http://code.google.com/p/jsonpath/>.
 
 Copyright 2007 Stefan Goessner.
 
-Copyright 2010 Toby Inkster.
+Copyright 2010-2011 Toby Inkster.
 
 This module is tri-licensed. It is available under the X11 (a.k.a. MIT)
 licence; you can also redistribute it and/or modify it under the same

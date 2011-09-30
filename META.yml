@@ -8,7 +8,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.95'
+generated_by: 'Module::Install version 1.00'
 license: mit
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -26,7 +26,7 @@ requires:
   perl: 5.8.0
 resources:
   bugtracker: http://rt.cpan.org/Dist/Display.html?Queue=JSON-Path
-  homepage: http://search.cpan.org/dist/JSON-Path/
+  homepage: https://metacpan.org/release/JSON-Path
   license: http://opensource.org/licenses/mit-license.php
-  repository: http://goddamn.co.uk/viewvc/perlmods/JSON-Path/
-version: 0.100
+  repository: http://goddamn.co.uk/svn-web/perlmods/browse/JSON-Path/
+version: 0.101

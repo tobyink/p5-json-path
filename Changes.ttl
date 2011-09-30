@@ -51,6 +51,18 @@ my:v_0-100
 		dcs:item   [ rdfs:label "Minor documentation improvements."@en ] ;
 		] .
 
+my:v_0-101
+
+	a               :Version ;
+	dc:issued       "2011-09-29"^^xsd:date ;
+	:revision       "0.101"^^xsd:string ;
+	:file-release   <http://backpan.cpan.org/authors/id/T/TO/TOBYINK/JSON-Path-0.101.tar.gz> ;
+	dcs:changeset [
+		dcs:versus my:v_0-100 ;
+		dcs:item   [ rdfs:label "Fix retrieval of zeroth array element."@en ; a dcs:Bugfix ] ;
+		dcs:item   [ rdfs:label "Add more test cases."@en ; a dcs:Packaging ] ;
+		] .
+
 #############################################################
 
 my:project
@@ -69,7 +81,7 @@ my:project
 	:tester         toby:i ;
 	:created        "2010-07-28"^^xsd:date ;
 	:license        <http://opensource.org/licenses/mit-license.php> ;
-	:release        my:v_0-080_00 , my:v_0-080_01 , my:v_0-100 .
+	:release        my:v_0-080_00 , my:v_0-080_01 , my:v_0-100 , my:v_0-101 .
 
 #############################################################
 
