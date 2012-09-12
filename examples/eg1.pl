@@ -1,11 +1,11 @@
 use 5.010;
 use lib "lib";
 use lib "../JSON-JOM/lib";
-use JSON::JOM qw[from_json to_json uplift];
+use JSON::JOM qw[from_json to_json to_jom];
 use JSON::Path;
 use Scalar::Util qw[blessed];
 
-my $object = uplift(from_json(<<'JSON'));
+my $object = to_jom(from_json(<<'JSON'));
 { "store": {
     "book": [ 
       { "category": "reference",

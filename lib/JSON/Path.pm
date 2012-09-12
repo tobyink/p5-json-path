@@ -1,13 +1,14 @@
 package JSON::Path;
 
 use 5.008;
-use common::sense;
+use strict qw(vars subs);
 use overload '""' => \&to_string;
+no warnings;
 
-our $VERSION = '0.101';
+our $VERSION = '0.200';
 our $Safe    = 1;
 
-use Error qw[:try];
+use Carp;
 use JSON qw[from_json];
 
 sub new
@@ -61,12 +62,13 @@ sub paths
 package JSON::Path::Helper;
 
 use 5.008;
-use common::sense;
+use strict qw(vars refs);
+no warnings;
 
-use Error qw[:try];
+use Carp;
 use Scalar::Util qw[blessed];
 
-our $VERSION = '0.101';
+our $VERSION = '0.200';
 
 sub new
 {
@@ -243,7 +245,7 @@ sub walk
 	
 	else
 	{
-		throw Error::Simple('walk called on non hashref/arrayref value.');
+		croak('walk called on non hashref/arrayref value, died');
 	}
 }
 
@@ -282,8 +284,7 @@ sub evalx
 {
 	my ($self, $x, $v, $vname) = @_;
 	
-	throw Error::Simple('non-safe evaluation.')
-		if $JSON::Path::Safe;
+	croak('non-safe evaluation, died') if $JSON::Path::Safe;
 		
 	my $expr = $x;
 	$expr =~ s/\$root/\$self->{'obj'}/g;
@@ -294,7 +295,7 @@ sub evalx
 	
 	if ($@)
 	{
-		throw Error::Simple("eval failed: $expr");
+		croak("eval failed: `$expr`, died");
 	}
 	
 	return $res;
@@ -399,8 +400,6 @@ capable of being decoded by JSON::from_json.
 
 Returns a list of structures from within $object which match against the
 JSONPath expression.
-
-This method will sometimes throw an error using the L<Error> module.
 
 =item C<<  paths($object)  >>
 
