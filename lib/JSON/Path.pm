@@ -5,15 +5,42 @@ use strict qw(vars subs);
 use overload '""' => \&to_string;
 no warnings;
 
-our $VERSION = '0.200';
-our $Safe    = 1;
+our $AUTHORITY = 'cpan:TOBYINK';
+our $VERSION   = '0.202';
+our $Safe      = 1;
 
 use Carp;
 use JSON qw[from_json];
+use Scalar::Util qw[blessed];
+use lvalue ();
+
+use Sub::Exporter -setup => {
+	exports => [qw/ jpath jpath1 jpath_map /],
+};
+
+sub jpath
+{
+	my ($object, $expression) = @_;
+	my @return = __PACKAGE__->new($expression)->values($object);
+}
+
+sub jpath1 :lvalue
+{
+	my ($object, $expression) = @_;
+	__PACKAGE__->new($expression)->value($object);
+}
+
+sub jpath_map (&$$)
+{
+	my ($coderef, $object, $expression) = @_;
+	return __PACKAGE__->new($expression)->map($object, $coderef);
+}
 
 sub new
 {
 	my ($class, $expression) = @_;
+	return $expression
+		if blessed($expression) && $expression->isa(__PACKAGE__);
 	return bless \$expression, $class;
 }
 
@@ -45,10 +72,41 @@ sub _get
 	return;
 }
 
-sub values
+sub _dive :lvalue
 {
-	my ($self, $object) = @_;
-	return $self->_get($object, 'VALUE');
+	my ($obj, $path) = @_;
+	
+	$path = [
+		$path =~ /\[(.+?)\]/g
+	] unless ref $path;
+	
+	while (@$path > 1) {
+		my $chunk = shift @$path;
+		if (JSON::Path::Helper::isObject($obj))
+			{ $obj = $obj->{$chunk} }
+		elsif (JSON::Path::Helper::isArray($obj))
+			{ $obj = $obj->[$chunk] }
+		else
+			{ print "Huh?" }
+	}
+	
+	my $chunk = shift @$path;
+	lvalue::get {
+		if (JSON::Path::Helper::isObject($obj))
+			{ $obj = $obj->{$chunk} }
+		elsif (JSON::Path::Helper::isArray($obj))
+			{ $obj = $obj->[$chunk] }
+		else
+			{ print "hUh?" }
+	}
+	lvalue::set {
+		if (JSON::Path::Helper::isObject($obj))
+			{ $obj->{$chunk} = shift }
+		elsif (JSON::Path::Helper::isArray($obj))
+			{ $obj->[$chunk] = shift }
+		else
+			{ print "huH?" }
+	}
 }
 
 sub paths
@@ -57,265 +115,322 @@ sub paths
 	return $self->_get($object, 'PATH');
 }
 
-1;
-
-package JSON::Path::Helper;
-
-use 5.008;
-use strict qw(vars refs);
-no warnings;
-
-use Carp;
-use Scalar::Util qw[blessed];
-
-our $VERSION = '0.200';
-
-sub new
+sub get
 {
-	return bless {
-		obj        => undef,
-		resultType => 'VALUE',
-		result     => [],
-		subx       => [],
-		}, $_[0];
+	my ($self, $object) = @_;
+	return $self->_get($object, 'VALUE');
 }
 
-sub normalize
+sub set
 {
-	my ($self, $x) = @_;
-	$x =~ s/[\['](\??\(.*?\))[\]']/_callback_01($self,$1)/eg;
-	$x =~ s/'?\.'?|\['?/;/g;
-	$x =~ s/;;;|;;/;..;/g;
-	$x =~ s/;\$|'?\]|'$//g;
-	$x =~ s/#([0-9]+)/_callback_02($self,$1)/eg;
-	$self->{'result'} = [];   # result array was temporarily used as a buffer
-	return $x;
-}
-
-sub _callback_01
-{
-	my ($self, $m1) = @_;
-	push @{ $self->{'result'} }, $m1;
-	my $last_index = scalar @{ $self->{'result'} } - 1;
-	return "[#${last_index}]";
-}
-
-sub _callback_02
-{
-	my ($self, $m1) = @_;
-	return $self->{'result'}->[$m1];
-}
-
-sub asPath
-{
-	my ($self, $path) = @_;
-	my @x = split /\;/, $path;
-	my $p = '$';
-	my $n = scalar(@x);
-	for (my $i=1; $i<$n; $i++)
+	my ($self, $object, $value, $limit) = @_;
+	my $count = 0;
+	foreach my $path ( $self->_get($object, 'PATH') )
 	{
-		$p .= /^[0-9*]+$/ ? ("[".$x[$i]."]") : ("['".$x[$i]."']");
+		_dive($object, $path) = $value;
+		++$count;
+		last if $limit && ($count >= $limit);
 	}
-	return $p;
+	return $count;
 }
 
-sub store
+sub value :lvalue
 {
-	my ($self, $p, $v) = @_;
-	push @{ $self->{'result'} }, ( $self->{'resultType'} eq "PATH" ? $self->asPath($p) : $v )
-		if $p;
-	return !!$p;
+	my ($self, $object) = @_;
+	lvalue::get {
+		my ($value) = $self->get($object);
+		return $value;
+	}
+	lvalue::set {
+		my $value = shift;
+		$self->set($object, $value, 1);
+	}
 }
 
-sub trace
+sub values
 {
-	my ($self, $expr, $val, $path) = @_;
-	
-	return $self->store($path, $val) if "$expr" eq '';
-	#return $self->store($path, $val) unless $expr;
-	
-	my ($loc, $x);
+	my ($self, $object) = @_;
+	my @values = $self->get($object);
+	wantarray ? @values : scalar @values;
+}
+
+sub map
+{
+	my ($self, $object, $coderef) = @_;
+	my $count;
+	foreach my $path ( $self->_get($object, 'PATH') )
 	{
-		my @x = split /\;/, $expr;
-		$loc  = shift @x;
-		$x    = join ';', @x;
+		++$count;
+		my $value = do {
+			local $_ = _dive($object, $path);
+			local $. = $path;
+			scalar $coderef->();
+		};
+		_dive($object, $path) = $value;
+	}
+	return $count;
+}
+
+BEGIN {
+	package JSON::Path::Helper;
+	
+	use 5.008;
+	use strict qw(vars refs);
+	no warnings;
+	
+	our $AUTHORITY = 'cpan:TOBYINK';
+	our $VERSION   = '0.202';
+	
+	use Carp;
+	use Scalar::Util qw[blessed];
+	
+	sub new
+	{
+		return bless {
+			obj        => undef,
+			resultType => 'VALUE',
+			result     => [],
+			subx       => [],
+			}, $_[0];
 	}
 	
-	# in Perl need to distinguish between arrays and hashes.
-	if (isArray($val)
-	and $loc =~ /^\-?[0-9]+$/
-	and exists $val->[$loc])
+	sub normalize
 	{
-		$self->trace($x, $val->[$loc], sprintf('%s;%s', $path, $loc));
-	}
-	elsif (isObject($val)
-	and exists $val->{$loc})
-	{
-		$self->trace($x, $val->{$loc}, sprintf('%s;%s', $path, $loc));
-	}
-	elsif ($loc eq '*')
-	{
-		$self->walk($loc, $x, $val, $path, \&_callback_03);
-	}
-	elsif ($loc eq '..')
-	{
-		$self->trace($x, $val, $path);
-		$self->walk($loc, $x, $val, $path, \&_callback_04);
-	}
-	elsif ($loc =~ /\,/)  # [name1,name2,...]
-	{
-		$self->trace($_.';'.$x, $val, $path)
-			foreach split /\,/, $loc;
-	}
-	elsif ($loc =~ /^\(.*?\)$/) # [(expr)]
-	{
-		my $evalx = $self->evalx($loc, $val, substr($path, rindex($path,";")+1));
-		$self->trace($evalx.';'.$x, $val, $path);
-	}
-	elsif ($loc =~ /^\?\(.*?\)$/) # [?(expr)]
-	{
-		# my $evalx = $self->evalx($loc, $val, substr($path, rindex($path,";")+1));
-		$self->walk($loc, $x, $val, $path, \&_callback_05);
-	}
-	elsif ($loc =~ /^(-?[0-9]*):(-?[0-9]*):?(-?[0-9]*)$/) # [start:end:step]  python slice syntax
-	{
-		$self->slice($loc, $x, $val, $path);
-	}
-}
-
-sub _callback_03
-{
-	my ($self, $m, $l, $x, $v, $p) = @_;
-	$self->trace($m.";".$x,$v,$p);
-}
-
-sub _callback_04
-{
-	my ($self, $m, $l, $x, $v, $p) = @_;
-
-	if (isArray($v)
-	and isArray($v->[$m]) || isObject($v->[$m]))
-	{
-		$self->trace("..;".$x, $v->[$m], $p.";".$m);
-	}
-	elsif (isObject($v)
-	and isArray($v->{$m}) || isObject($v->{$m}))
-	{
-		$self->trace("..;".$x, $v->{$m}, $p.";".$m);
-	}
-}
-
-sub _callback_05
-{
-	my ($self, $m, $l, $x, $v, $p) = @_;
-	
-	$l =~ s/^\?\((.*?)\)$/$1/g;
-	
-	my $evalx;
-	if (isArray($v))
-	{
-		$evalx = $self->evalx($l, $v->[$m]);
-	}
-	elsif (isObject($v))
-	{
-		$evalx = $self->evalx($l, $v->{$m});
+		my ($self, $x) = @_;
+		$x =~ s/[\['](\??\(.*?\))[\]']/_callback_01($self,$1)/eg;
+		$x =~ s/'?\.'?|\['?/;/g;
+		$x =~ s/;;;|;;/;..;/g;
+		$x =~ s/;\$|'?\]|'$//g;
+		$x =~ s/#([0-9]+)/_callback_02($self,$1)/eg;
+		$self->{'result'} = [];   # result array was temporarily used as a buffer
+		return $x;
 	}
 	
-	$self->trace($m.";".$x, $v, $p)
-		if $evalx;
-}
-
-sub walk
-{
-	my ($self, $loc, $expr, $val, $path, $f) = @_;
-
-	if (isArray($val))
+	sub _callback_01
 	{
-		map {
-			$f->($self, $_, $loc, $expr, $val, $path);
-		} 0..scalar @$val;
-	}
-
-	elsif (isObject($val))
-	{
-		map {
-			$f->($self, $_, $loc, $expr, $val, $path);
-		} keys %$val;
+		my ($self, $m1) = @_;
+		push @{ $self->{'result'} }, $m1;
+		my $last_index = scalar @{ $self->{'result'} } - 1;
+		return "[#${last_index}]";
 	}
 	
-	else
+	sub _callback_02
 	{
-		croak('walk called on non hashref/arrayref value, died');
+		my ($self, $m1) = @_;
+		return $self->{'result'}->[$m1];
 	}
-}
-
-sub slice
-{
-	my ($self, $loc, $expr, $v, $path) = @_;
 	
-	$loc =~ s/^(-?[0-9]*):(-?[0-9]*):?(-?[0-9]*)$/$1:$2:$3/;
-	my @s   = split /\:/, $loc;
-	my $len = scalar @$v;
-
-	my $start = $s[0]+0 ? $s[0]+0 : 0;
-	my $end   = $s[1]+0 ? $s[1]+0 : $len;
-	my $step  = $s[2]+0 ? $s[2]+0 : 1;
-
-	$start = ($start < 0) ? max(0,$start+$len) : min($len,$start);
-	$end   = ($end < 0)   ? max(0,$end+$len)   : min($len,$end);
-
-	for (my $i=$start; $i<$end; $i+=$step)
+	sub asPath
 	{
-		$self->trace($i.";".$expr, $v, $path);
+		my ($self, $path) = @_;
+		my @x = split /\;/, $path;
+		my $p = '$';
+		my $n = scalar(@x);
+		for (my $i=1; $i<$n; $i++)
+		{
+			$p .= /^[0-9]+$/ ? ("[".$x[$i]."]") : ("['".$x[$i]."']");
+		}
+		return $p;
 	}
-}
-
-sub max
-{
-	return $_[0] > $_[1] ? $_[0] : $_[1];
-}
-
-sub min
-{
-	return $_[0] < $_[1] ? $_[0] : $_[1];
-}
-
-sub evalx
-{
-	my ($self, $x, $v, $vname) = @_;
 	
-	croak('non-safe evaluation, died') if $JSON::Path::Safe;
+	sub store
+	{
+		my ($self, $p, $v) = @_;
+		push @{ $self->{'result'} }, ( $self->{'resultType'} eq "PATH" ? $self->asPath($p) : $v )
+			if $p;
+		return !!$p;
+	}
+	
+	sub trace
+	{
+		my ($self, $expr, $val, $path) = @_;
 		
-	my $expr = $x;
-	$expr =~ s/\$root/\$self->{'obj'}/g;
-	$expr =~ s/\$_/\$v/g;
-
-	local $@ = undef;
-	my $res = eval $expr;
-	
-	if ($@)
-	{
-		croak("eval failed: `$expr`, died");
+		return $self->store($path, $val) if "$expr" eq '';
+		#return $self->store($path, $val) unless $expr;
+		
+		my ($loc, $x);
+		{
+			my @x = split /\;/, $expr;
+			$loc  = shift @x;
+			$x    = join ';', @x;
+		}
+		
+		# in Perl need to distinguish between arrays and hashes.
+		if (isArray($val)
+		and $loc =~ /^\-?[0-9]+$/
+		and exists $val->[$loc])
+		{
+			$self->trace($x, $val->[$loc], sprintf('%s;%s', $path, $loc));
+		}
+		elsif (isObject($val)
+		and exists $val->{$loc})
+		{
+			$self->trace($x, $val->{$loc}, sprintf('%s;%s', $path, $loc));
+		}
+		elsif ($loc eq '*')
+		{
+			$self->walk($loc, $x, $val, $path, \&_callback_03);
+		}
+		elsif ($loc eq '..')
+		{
+			$self->trace($x, $val, $path);
+			$self->walk($loc, $x, $val, $path, \&_callback_04);
+		}
+		elsif ($loc =~ /\,/)  # [name1,name2,...]
+		{
+			$self->trace($_.';'.$x, $val, $path)
+				foreach split /\,/, $loc;
+		}
+		elsif ($loc =~ /^\(.*?\)$/) # [(expr)]
+		{
+			my $evalx = $self->evalx($loc, $val, substr($path, rindex($path,";")+1));
+			$self->trace($evalx.';'.$x, $val, $path);
+		}
+		elsif ($loc =~ /^\?\(.*?\)$/) # [?(expr)]
+		{
+			# my $evalx = $self->evalx($loc, $val, substr($path, rindex($path,";")+1));
+			$self->walk($loc, $x, $val, $path, \&_callback_05);
+		}
+		elsif ($loc =~ /^(-?[0-9]*):(-?[0-9]*):?(-?[0-9]*)$/) # [start:end:step]  python slice syntax
+		{
+			$self->slice($loc, $x, $val, $path);
+		}
 	}
 	
-	return $res;
-}
-
-sub isObject
-{
-	my $obj = shift;
-	return 1 if ref($obj) eq 'HASH';
-	return 1 if blessed($obj) && $obj->can('typeof') && $obj->typeof eq 'HASH';
-	return;
-}
-
-sub isArray
-{
-	my $obj = shift;
-	return 1 if ref($obj) eq 'ARRAY';
-	return 1 if blessed($obj) && $obj->can('typeof') && $obj->typeof eq 'ARRAY';
-	return;
-}
+	sub _callback_03
+	{
+		my ($self, $m, $l, $x, $v, $p) = @_;
+		$self->trace($m.";".$x,$v,$p);
+	}
+	
+	sub _callback_04
+	{
+		my ($self, $m, $l, $x, $v, $p) = @_;
+		
+		if (isArray($v)
+		and isArray($v->[$m]) || isObject($v->[$m]))
+		{
+			$self->trace("..;".$x, $v->[$m], $p.";".$m);
+		}
+		elsif (isObject($v)
+		and isArray($v->{$m}) || isObject($v->{$m}))
+		{
+			$self->trace("..;".$x, $v->{$m}, $p.";".$m);
+		}
+	}
+	
+	sub _callback_05
+	{
+		my ($self, $m, $l, $x, $v, $p) = @_;
+		
+		$l =~ s/^\?\((.*?)\)$/$1/g;
+		
+		my $evalx;
+		if (isArray($v))
+		{
+			$evalx = $self->evalx($l, $v->[$m]);
+		}
+		elsif (isObject($v))
+		{
+			$evalx = $self->evalx($l, $v->{$m});
+		}
+		
+		$self->trace($m.";".$x, $v, $p)
+			if $evalx;
+	}
+	
+	sub walk
+	{
+		my ($self, $loc, $expr, $val, $path, $f) = @_;
+		
+		if (isArray($val))
+		{
+			map {
+				$f->($self, $_, $loc, $expr, $val, $path);
+			} 0..scalar @$val;
+		}
+		
+		elsif (isObject($val))
+		{
+			map {
+				$f->($self, $_, $loc, $expr, $val, $path);
+			} keys %$val;
+		}
+		
+		else
+		{
+			croak('walk called on non hashref/arrayref value, died');
+		}
+	}
+	
+	sub slice
+	{
+		my ($self, $loc, $expr, $v, $path) = @_;
+		
+		$loc =~ s/^(-?[0-9]*):(-?[0-9]*):?(-?[0-9]*)$/$1:$2:$3/;
+		my @s   = split /\:/, $loc;
+		my $len = scalar @$v;
+		
+		my $start = $s[0]+0 ? $s[0]+0 : 0;
+		my $end   = $s[1]+0 ? $s[1]+0 : $len;
+		my $step  = $s[2]+0 ? $s[2]+0 : 1;
+		
+		$start = ($start < 0) ? max(0,$start+$len) : min($len,$start);
+		$end   = ($end < 0)   ? max(0,$end+$len)   : min($len,$end);
+		
+		for (my $i=$start; $i<$end; $i+=$step)
+		{
+			$self->trace($i.";".$expr, $v, $path);
+		}
+	}
+	
+	sub max
+	{
+		return $_[0] > $_[1] ? $_[0] : $_[1];
+	}
+	
+	sub min
+	{
+		return $_[0] < $_[1] ? $_[0] : $_[1];
+	}
+	
+	sub evalx
+	{
+		my ($self, $x, $v, $vname) = @_;
+		
+		croak('non-safe evaluation, died') if $JSON::Path::Safe;
+			
+		my $expr = $x;
+		$expr =~ s/\$root/\$self->{'obj'}/g;
+		$expr =~ s/\$_/\$v/g;
+		
+		local $@ = undef;
+		my $res = eval $expr;
+		
+		if ($@)
+		{
+			croak("eval failed: `$expr`, died");
+		}
+		
+		return $res;
+	}
+	
+	sub isObject
+	{
+		my $obj = shift;
+		return 1 if ref($obj) eq 'HASH';
+		return 1 if blessed($obj) && $obj->can('typeof') && $obj->typeof eq 'HASH';
+		return;
+	}
+	
+	sub isArray
+	{
+		my $obj = shift;
+		return 1 if ref($obj) eq 'ARRAY';
+		return 1 if blessed($obj) && $obj->can('typeof') && $obj->typeof eq 'ARRAY';
+		return;
+	}
+};
 
 1;
 
@@ -366,8 +481,8 @@ JSON::Path - search nested hashref/arrayref structures using JSONPath
  my @authors = $jpath->values($data);
  
  # The author of the last (by order) book
- my $jpath     = JSON::Path->new('$..book[-1:]');
- my ($tolkien) = $jpath->values($data);
+ my $jpath   = JSON::Path->new('$..book[-1:]');
+ my $tolkien = $jpath->value($data);
 
 =head1 DESCRIPTION
 
@@ -375,8 +490,6 @@ This module implements JSONPath, an XPath-like language for searching
 JSON-like structures.
 
 JSONPath is described at L<http://goessner.net/articles/JsonPath/>.
-
-This module is JSON::JOM-compatible.
 
 =head2 Constructor
 
@@ -399,12 +512,39 @@ can be either a nested Perl hashref/arrayref structure, or a JSON string
 capable of being decoded by JSON::from_json.
 
 Returns a list of structures from within $object which match against the
-JSONPath expression.
+JSONPath expression. In scalar context, returns the number of matches.
+
+=item C<<  value($object)  >>
+
+Like C<values>, but returns just the first value. This method is an lvalue
+sub, which means you can assign to it:
+
+  $path->values('$.name') = 'Bob';
 
 =item C<<  paths($object)  >>
 
-As per C<values> but instead of returning structures which match
-the expression, returns paths that point towards those structures.
+As per C<values> but instead of returning structures which match the
+expression, returns canonical JSONPaths that point towards those structures.
+
+=item C<<  get($object)  >>
+
+In list context, identical to C<< values >>, but in scalar context returns
+the first result.
+
+=item C<<  set($object, $value, $limit)  >>
+
+Alters C<< $object >>, setting the paths to C<< $value >>. If set, then
+C<< $limit >> limits the number of changes made.
+
+Returns the number of changes made.
+
+=item C<<  map($object, $coderef)  >>
+
+Conceptually similar to Perl's C<map> keyword. Executes the coderef
+(in scalar context!) for each match of the path within the object,
+and sets a new value from the coderef's return value. Within the
+coderef, C<< $_ >> may be used to access the old value, and C<< $. >>
+may be used to access the curent canonical JSONPath.
 
 =item C<<  to_string  >>
 
@@ -415,6 +555,29 @@ stringify itself as appropriate. i.e. the following works:
 
  my $jpath = JSON::Path->new('$.store.book[*].author');
  print "I'm looking for: " . $jpath . "\n";
+
+=back
+
+=head2 Functions
+
+The following functions are available for export, but are not exported
+by default:
+
+=over
+
+=item C<< jpath($object, $path_string) >>
+
+Shortcut for C<< JSON::Path->new($path_string)->values($object) >>. That is,
+it can be used as an lvalue.
+
+=item C<< jpath1($object, $path_string) >>
+
+Shortcut for C<< JSON::Path->new($path_string)->value($object) >>. That is,
+it can be used as an lvalue.
+
+=item C<< jpath_map { CODE } $object, $path_string >>
+
+Shortcut for C<< JSON::Path->new($path_string)->map($object, $code) >>. 
 
 =back
 
@@ -497,7 +660,7 @@ See L<http://code.google.com/p/jsonpath/>.
 
 Copyright 2007 Stefan Goessner.
 
-Copyright 2010-2011 Toby Inkster.
+Copyright 2010-2012 Toby Inkster.
 
 This module is tri-licensed. It is available under the X11 (a.k.a. MIT)
 licence; you can also redistribute it and/or modify it under the same

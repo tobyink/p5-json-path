@@ -54,3 +54,18 @@ my:project :release my:v_0-080_00, my:v_0-080_01, my:v_0-100, my:v_0-101.
 		item "Modernize."^^Packaging;
 	].
 
+`JSON-Path 0.201 cpan:TOBYINK`
+	issued  2012-09-12;
+	changeset [
+		item "Remove remaining `use Error` in test suite."^^Bugfix;
+	].
+
+`JSON-Path 0.202 cpan:TOBYINK`
+	issued  2012-10-12;
+	changeset [
+		item "'value' method."^^Addition;
+		item "'map' method."^^Addition;
+		item "'get' and 'set' methods."^^Addition;
+		item "'jpath', 'jpath1' and 'jpath_map' functions."^^Addition;
+	].
+

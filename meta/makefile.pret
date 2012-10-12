@@ -5,6 +5,8 @@
 	version_from      m`JSON::Path`;
 	readme_from       m`JSON::Path`;
 	requires          p`JSON 2.00`;
+	requires          p`Sub::Exporter`;
+	requires          p`lvalue`;
 	test_requires     p`Test::More 0.61`;
 .
 

@@ -1,11 +1,8 @@
-use 5.010;
-use lib "lib";
-use lib "../JSON-JOM/lib";
-use JSON::JOM qw[from_json to_json to_jom];
-use JSON::Path;
-use Scalar::Util qw[blessed];
+use Test::More;
+use JSON::Path -all;
 
-my $object = to_jom(from_json(<<'JSON'));
+use JSON;
+my $object = from_json(<<'JSON');
 {
 	"store": {
 		"book": [
@@ -44,16 +41,28 @@ my $object = to_jom(from_json(<<'JSON'));
 }
 JSON
 
-$JSON::Path::Safe = 0;
+my $path1 = '$.store.book[*].title';
 
-foreach ('$.store.book[0].title', '$.store.book[*].author', '$..author', '$..book[-1:]',
-	'$..book[?($_->{author} =~ /tolkien/i)]')
-{
-	my $jpath = JSON::Path->new($_);
-	say $jpath;
-	say to_json([$jpath->values($object)], {pretty=>1});
-	say to_json([$jpath->paths($object)], {pretty=>1});
-	say [$jpath->values($object)]->[0]->nodePath
-		if blessed([$jpath->values($object)]->[0]);
-	say '-' x 40;
-}
+jpath_map { uc $_ } $object, '$.store.book[*].title';
+
+is_deeply(
+	[ jpath1($object, $path1) ],
+	[ map uc,'Sayings of the Century' ],
+);
+
+is_deeply(
+	[ jpath($object, $path1) ],
+	[ map uc, 'Sayings of the Century', 'Sword of Honour', 'Moby Dick', 'The Lord of the Rings' ],
+);
+
+is(
+	JSON::Path->new('$.store.book[*].author')->set($object => 'Anon', 2),
+	2,
+);
+
+is_deeply(
+	[ jpath($object, '$.store.book[*].author') ],
+	[ 'Anon', 'Anon', 'Herman Melville', 'J. R. R. Tolkien' ],
+);
+
+done_testing();
