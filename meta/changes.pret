@@ -69,3 +69,9 @@ my:project :release my:v_0-080_00, my:v_0-080_01, my:v_0-100, my:v_0-101.
 		item "'jpath', 'jpath1' and 'jpath_map' functions."^^Addition;
 	].
 
+`JSON-Path 0.203 cpan:TOBYINK`
+	issued  2012-10-12;
+	changeset [
+		item "Minor corrections to pod."^^Documentation;
+	].
+

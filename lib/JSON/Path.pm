@@ -6,7 +6,7 @@ use overload '""' => \&to_string;
 no warnings;
 
 our $AUTHORITY = 'cpan:TOBYINK';
-our $VERSION   = '0.202';
+our $VERSION   = '0.203';
 our $Safe      = 1;
 
 use Carp;
@@ -179,7 +179,7 @@ BEGIN {
 	no warnings;
 	
 	our $AUTHORITY = 'cpan:TOBYINK';
-	our $VERSION   = '0.202';
+	our $VERSION   = '0.203';
 	
 	use Carp;
 	use Scalar::Util qw[blessed];
@@ -476,13 +476,17 @@ JSON::Path - search nested hashref/arrayref structures using JSONPath
   },
  };
  
- # All authors of books in the store
- my $jpath   = JSON::Path->new('$.store.book[*].author');
- my @authors = $jpath->values($data);
+ # All books in the store
+ my $jpath   = JSON::Path->new('$.store.book[*]');
+ my @books   = $jpath->values($data);
  
  # The author of the last (by order) book
- my $jpath   = JSON::Path->new('$..book[-1:]');
+ my $jpath   = JSON::Path->new('$..book[-1:].author');
  my $tolkien = $jpath->value($data);
+ 
+ # Convert all authors to uppercase
+ use JSON::Path 'jpath_map';
+ jpath_map { uc $_ } $object, '$.store.book[*].author';
 
 =head1 DESCRIPTION
 
@@ -519,7 +523,7 @@ JSONPath expression. In scalar context, returns the number of matches.
 Like C<values>, but returns just the first value. This method is an lvalue
 sub, which means you can assign to it:
 
-  $path->values('$.name') = 'Bob';
+  $path->value('$.name') = 'Bob';
 
 =item C<<  paths($object)  >>
 
@@ -567,13 +571,12 @@ by default:
 
 =item C<< jpath($object, $path_string) >>
 
-Shortcut for C<< JSON::Path->new($path_string)->values($object) >>. That is,
-it can be used as an lvalue.
+Shortcut for C<< JSON::Path->new($path_string)->values($object) >>.
 
 =item C<< jpath1($object, $path_string) >>
 
-Shortcut for C<< JSON::Path->new($path_string)->value($object) >>. That is,
-it can be used as an lvalue.
+Shortcut for C<< JSON::Path->new($path_string)->value($object) >>.
+Like C<value>, it can be used as an lvalue.
 
 =item C<< jpath_map { CODE } $object, $path_string >>
 
