@@ -79,6 +79,7 @@ sub _dive :lvalue
 	$path = [
 		$path =~ /\[(.+?)\]/g
 	] unless ref $path;
+	$path = [ map { /^'(.+)'$/ ? $1 : $_ } @$path ];
 	
 	while (@$path > 1) {
 		my $chunk = shift @$path;
@@ -186,12 +187,12 @@ BEGIN {
 	
 	sub new
 	{
-		return bless {
+		bless {
 			obj        => undef,
 			resultType => 'VALUE',
 			result     => [],
 			subx       => [],
-			}, $_[0];
+		}, $_[0];
 	}
 	
 	sub normalize
