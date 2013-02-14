@@ -1,3 +1,23 @@
+=head1 PURPOSE
+
+Some basic JSON Path selection tests, including some using C<eval>,
+checking that its disallowed by default but can be switched on using
+the C<< $JSON::Path::Safe >> package variable.
+
+=head1 AUTHOR
+
+Toby Inkster E<lt>tobyink@cpan.orgE<gt>.
+
+=head1 COPYRIGHT AND LICENCE
+
+Copyright 2010-2013 Toby Inkster.
+
+This module is tri-licensed. It is available under the X11 (a.k.a. MIT)
+licence; you can also redistribute it and/or modify it under the same
+terms as Perl itself.
+
+=cut
+
 use Test::More tests => 10;
 BEGIN { use_ok('JSON::Path') };
 

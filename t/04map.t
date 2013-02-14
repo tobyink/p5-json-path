@@ -1,3 +1,21 @@
+=head1 PURPOSE
+
+Test C<jpath_map> exported function.
+
+=head1 AUTHOR
+
+Toby Inkster E<lt>tobyink@cpan.orgE<gt>.
+
+=head1 COPYRIGHT AND LICENCE
+
+Copyright 2012-2013 Toby Inkster.
+
+This module is tri-licensed. It is available under the X11 (a.k.a. MIT)
+licence; you can also redistribute it and/or modify it under the same
+terms as Perl itself.
+
+=cut
+
 use Test::More;
 use JSON::Path -all;
 

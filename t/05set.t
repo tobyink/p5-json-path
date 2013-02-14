@@ -2,9 +2,21 @@
 
 Exercise C<< JSON::Path::set >>.
 
+=head1 SEE ALSO
+
+L<https://rt.cpan.org/Ticket/Display.html?id=83249>.
+
 =head1 AUTHOR
 
-m.nacamura at gmail.com
+Mitsuhiro Nakamura
+
+=head1 COPYRIGHT AND LICENCE
+
+Copyright 2013 Mitsuhiro Nakamura.
+
+This module is tri-licensed. It is available under the X11 (a.k.a. MIT)
+licence; you can also redistribute it and/or modify it under the same
+terms as Perl itself.
 
 =cut
 
