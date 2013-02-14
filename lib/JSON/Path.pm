@@ -524,7 +524,9 @@ JSONPath expression. In scalar context, returns the number of matches.
 Like C<values>, but returns just the first value. This method is an lvalue
 sub, which means you can assign to it:
 
-  $path->value('$.name') = 'Bob';
+  my $person = { name => "Robert" };
+  my $path = JSON::Path->new('$.name');
+  $path->value($person) = "Bob";
 
 =item C<<  paths($object)  >>
 
