@@ -63,15 +63,28 @@ my:project :release my:v_0-080_00, my:v_0-080_01, my:v_0-100, my:v_0-101.
 `JSON-Path 0.202 cpan:TOBYINK`
 	issued  2012-10-12;
 	changeset [
-		item "'value' method."^^Addition;
-		item "'map' method."^^Addition;
-		item "'get' and 'set' methods."^^Addition;
-		item "'jpath', 'jpath1' and 'jpath_map' functions."^^Addition;
+		item "`value` method."^^Addition;
+		item "`map` method."^^Addition;
+		item "`get` and `set` methods."^^Addition;
+		item "`jpath`, `jpath1` and `jpath_map` functions."^^Addition;
 	].
 
 `JSON-Path 0.203 cpan:TOBYINK`
 	issued  2012-10-12;
 	changeset [
 		item "Minor corrections to pod."^^Documentation;
+	].
+
+`JSON-Path 0.204 cpan:TOBYINK`
+	issued  2013-02-14;
+	changeset [
+		item "Corrections to lvalue documentation."^^Documentation;
+		item "Add documentation to test suite."^^Documentation;
+		item [
+			a          dcs:Bugfix;
+			label      "Fix `set` method which was broken in some circumstances.";
+			dcs:fixes  RT#83249;
+			dcs:thanks [ a foaf:Person; foaf:name "Mitsuhiro Nakamura" ];
+		];
 	].
 

@@ -6,7 +6,7 @@ use overload '""' => \&to_string;
 no warnings;
 
 our $AUTHORITY = 'cpan:TOBYINK';
-our $VERSION   = '0.203';
+our $VERSION   = '0.204';
 our $Safe      = 1;
 
 use Carp;
@@ -180,7 +180,7 @@ BEGIN {
 	no warnings;
 	
 	our $AUTHORITY = 'cpan:TOBYINK';
-	our $VERSION   = '0.203';
+	our $VERSION   = '0.204';
 	
 	use Carp;
 	use Scalar::Util qw[blessed];

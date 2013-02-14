@@ -1,2 +1,2 @@
-use inc::Module::Package 'RDF 0.009';
+use inc::Module::Package 'RDF:tobyink 0.009';
 
