@@ -1,12 +1,8 @@
 # This file provides instructions for packaging.
 
 `JSON-Path`
-	perl_version_from m`JSON::Path`;
-	version_from      m`JSON::Path`;
-	readme_from       m`JSON::Path`;
-	requires          p`JSON 2.00`;
-	requires          p`Exporter::Tiny`;
-	requires          p`LV`;
-	test_requires     p`Test::More 0.61`;
-.
-
+	deps:runtime-requirement  [ deps:on "JSON 2.00"^^deps:CpanId ];
+	deps:runtime-requirement  [ deps:on "Exporter::Tiny"^^deps:CpanId ];
+	deps:runtime-requirement  [ deps:on "LV"^^deps:CpanId ];
+	deps:test-requirement     [ deps:on "Test::More 0.61"^^deps:CpanId ];
+	.

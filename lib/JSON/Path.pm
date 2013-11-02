@@ -5,7 +5,7 @@ use warnings;
 package JSON::Path;
 
 our $AUTHORITY = 'cpan:TOBYINK';
-our $VERSION   = '0.204';
+our $VERSION   = '0.205';
 our $Safe      = 1;
 
 use Carp;
@@ -192,7 +192,7 @@ BEGIN {
 	no warnings;
 	
 	our $AUTHORITY = 'cpan:TOBYINK';
-	our $VERSION   = '0.204';
+	our $VERSION   = '0.205';
 	
 	use Carp;
 	use Scalar::Util qw[blessed];

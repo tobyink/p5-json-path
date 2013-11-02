@@ -88,3 +88,17 @@ my:project :release my:v_0-080_00, my:v_0-080_01, my:v_0-100, my:v_0-101.
 		];
 	].
 
+`JSON-Path 0.205 cpan:TOBYINK`
+	issued  2013-11-02;
+	changeset [
+		item "Use Dist::Inkt."^^Packaging;
+		item "Use LV instead of lvalue.pm."^^Change;
+		item "Use Exporter::Tiny instead of Sub::Exporter."^^Change;
+		item [
+			a          dcs:Bugfix;
+			label      "Fix problem using JSON::Path with Devel::ptkdb.";
+			dcs:fixes  RT#89393;
+			dcs:thanks [ a foaf:Person; foaf:name "Henri-Damien Laurent" ];
+		];
+	].
+
