@@ -1,9 +1,8 @@
-package JSON::Path;
-
 use 5.008;
-use strict qw(vars subs);
-use overload '""' => \&to_string;
-no warnings;
+use strict;
+use warnings;
+
+package JSON::Path;
 
 our $AUTHORITY = 'cpan:TOBYINK';
 our $VERSION   = '0.204';
@@ -14,9 +13,11 @@ use JSON qw[from_json];
 use Scalar::Util qw[blessed];
 use LV ();
 
-use Sub::Exporter -setup => {
-	exports => [qw/ jpath jpath1 jpath_map /],
-};
+use Exporter::Tiny ();
+our @ISA       = qw/ Exporter::Tiny /;
+our @EXPORT_OK = qw/ jpath jpath1 jpath_map /;
+
+use overload '""' => \&to_string;
 
 sub jpath
 {
@@ -173,6 +174,7 @@ sub map
 	{
 		++$count;
 		my $value = do {
+			no warnings 'numeric';
 			local $_ = _dive($object, $path);
 			local $. = $path;
 			scalar $coderef->();
