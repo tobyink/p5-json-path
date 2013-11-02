@@ -12,7 +12,7 @@ our $Safe      = 1;
 use Carp;
 use JSON qw[from_json];
 use Scalar::Util qw[blessed];
-use lvalue ();
+use LV ();
 
 use Sub::Exporter -setup => {
 	exports => [qw/ jpath jpath1 jpath_map /],
@@ -81,7 +81,8 @@ sub _dive :lvalue
 	] unless ref $path;
 	$path = [ map { /^'(.+)'$/ ? $1 : $_ } @$path ];
 	
-	while (@$path > 1) {
+	while (@$path > 1)
+	{
 		my $chunk = shift @$path;
 		if (JSON::Path::Helper::isObject($obj))
 			{ $obj = $obj->{$chunk} }
@@ -92,22 +93,27 @@ sub _dive :lvalue
 	}
 	
 	my $chunk = shift @$path;
-	lvalue::get {
-		if (JSON::Path::Helper::isObject($obj))
-			{ $obj = $obj->{$chunk} }
-		elsif (JSON::Path::Helper::isArray($obj))
-			{ $obj = $obj->[$chunk] }
-		else
-			{ print "hUh?" }
-	}
-	lvalue::set {
-		if (JSON::Path::Helper::isObject($obj))
-			{ $obj->{$chunk} = shift }
-		elsif (JSON::Path::Helper::isArray($obj))
-			{ $obj->[$chunk] = shift }
-		else
-			{ print "huH?" }
-	}
+	
+	LV::lvalue(
+		get => sub
+		{
+			if (JSON::Path::Helper::isObject($obj))
+				{ $obj = $obj->{$chunk} }
+			elsif (JSON::Path::Helper::isArray($obj))
+				{ $obj = $obj->[$chunk] }
+			else
+				{ print "hUh?" }
+		},
+		set => sub
+		{
+			if (JSON::Path::Helper::isObject($obj))
+				{ $obj->{$chunk} = shift }
+			elsif (JSON::Path::Helper::isArray($obj))
+				{ $obj->[$chunk] = shift }
+			else
+				{ print "huH?" }
+		},
+	);
 }
 
 sub paths
@@ -138,14 +144,18 @@ sub set
 sub value :lvalue
 {
 	my ($self, $object) = @_;
-	lvalue::get {
-		my ($value) = $self->get($object);
-		return $value;
-	}
-	lvalue::set {
-		my $value = shift;
-		$self->set($object, $value, 1);
-	}
+	LV::lvalue(
+		get => sub
+		{
+			my ($value) = $self->get($object);
+			return $value;
+		},
+		set => sub
+		{
+			my $value = shift;
+			$self->set($object, $value, 1);
+		},
+	);
 }
 
 sub values
