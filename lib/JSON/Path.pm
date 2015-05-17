@@ -292,7 +292,7 @@ BEGIN {
 		elsif ($loc =~ /\,/)  # [name1,name2,...]
 		{
 			$self->trace($_.';'.$x, $val, $path)
-				foreach split /\,/, $loc;
+				foreach split /'?\,'?/, $loc;
 		}
 		elsif ($loc =~ /^\(.*?\)$/) # [(expr)]
 		{
