@@ -18,7 +18,7 @@ terms as Perl itself.
 
 =cut
 
-use Test::More tests => 10;
+use Test::More tests => 12;
 BEGIN { use_ok('JSON::Path') };
 
 use JSON;
@@ -91,3 +91,8 @@ my ($results3) = $path3->values($object);
 
 is(ref $results3, 'HASH', "dangerous hashref value result");
 is($results3->{isbn}, "0-395-19395-8", "dangerous hashref seems to be correct");
+
+my $path4 = JSON::Path->new('$.store.book[0][\'category\',\'author\']');
+my @results4 = $path4->values($object);
+is($results4[0], 'reference', "first value in list of quoted fields seems to be correct");
+is($results4[1], 'Nigel Rees', "second value in list of quoted fields seems to be correct");
