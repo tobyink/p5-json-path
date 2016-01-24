@@ -9,7 +9,7 @@ our $VERSION   = '0.205';
 our $Safe      = 1;
 
 use Carp;
-use JSON qw[from_json];
+use JSON::MaybeXS qw[decode_json];
 use Scalar::Util qw[blessed];
 use LV ();
 
@@ -54,7 +54,7 @@ sub to_string
 sub _get
 {
 	my ($self, $object, $type) = @_;
-	$object = from_json($object) unless ref $object;
+	$object = decode_json($object) unless ref $object;
 	
 	my $helper = JSON::Path::Helper->new;
 	$helper->{'resultType'} = $type;
@@ -526,7 +526,8 @@ Given a JSONPath expression $string, returns a JSON::Path object.
 
 Evaluates the JSONPath expression against an object. The object $object
 can be either a nested Perl hashref/arrayref structure, or a JSON string
-capable of being decoded by JSON::from_json.
+capable of being decoded by JSON::MaybeXS decode_json (meaning especially
+that it should be UTF-8 encoded!).
 
 Returns a list of structures from within $object which match against the
 JSONPath expression. In scalar context, returns the number of matches.
