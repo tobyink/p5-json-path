@@ -4,17 +4,16 @@ use Test::Most;
 use JSON::Path::Compiler;
 
 my %EXPRESSIONS = (
-    q{$.[*].id}                                   => ['$', '.',     '[',            '*',    ']',    '.',    'id'],
-    q{$.[0].title}                                => ['$', '.',     '[',            '0',    ']',    '.',    'title'],
-    q{$..labels[?(@.name==bug)]}                  => ['$', '..',    'labels',       '[?(',  '@',    '.',    'name==bug',    ')]'],
-    q{$.addresses[?(@.addresstype.id == D84002)]} => ['$', '.',     'addresses',    '[?(',  '@',    '.',    'addresstype',  '.',         'id == D84002', ')]'],
-    q{$.store.book[(@.length-1)].title}           => ['$', '.',     'store',        '.',    'book', '[(',   '@',            '.',         'length-1',     ')]', '.',     'title'],
-    q{$.store.book[?(@.price < 10)].title}        => ['$', '.',     'store',        '.',    'book', '[?(',  '@',            '.',         'price < 10',   ')]', '.',     'title'],
-    q{$['store']['book'][0]['author']}            => ['$', '[',     'store',        ']',    '[',    'book', ']',            '[',         0,              ']', '[',      'author', ']'],
-    q{$['store']['book'][1]['author']}            => ['$', '[',     'store',        ']',    '[',    'book', ']',            '[',         1,              ']', '[',      'author', ']'],
-    q{$['store']['book'][2]['author']}            => ['$', '[',     'store',        ']',    '[',    'book', ']',            '[',         2,              ']', '[',      'author', ']'],
-    q{$['store']['book'][3]['author']}            => ['$', '[',     'store',        ']',    '[',    'book', ']',            '[',         3,              ']', '[',      'author', ']'],
-    q{$.[*].user[?(@.login == 'laurilehmijoki')]} => ['$', '.',     '[',            '*',    ']',    '.',    'user',         '[?(',       '@',             '.', q{login == 'laurilehmijoki'}, ')]'],
+    '$.[*].id'                                      => [qw/$ . [ * ] . id/],
+    q{$.[0].title}                                  => [qw/$ . [ 0 ] . title/],
+    q{$..labels[?(@.name==bug)]}                    => [qw/$ .. labels [?( @ . name == bug )]/],
+    q{$.store.book[(@.length-1)].title}             => [qw/$ . store . book [( @ . length-1 )] . title/],
+    q{$.store.book[?(@.price < 10)].title}          => [ qw/$ . store . book [?( @ . /, 'price ', '<', ' 10', qw/)] . title/ ],
+    q{$.store.book[?(@.price <= 10)].title}          => [ qw/$ . store . book [?( @ . /, 'price ', '<=', ' 10', qw/)] . title/ ],
+    q{$.store.book[?(@.price >= 10)].title}          => [ qw/$ . store . book [?( @ . /, 'price ', '>=', ' 10', qw/)] . title/ ],
+    q{$.store.book[?(@.price === 10)].title}          => [ qw/$ . store . book [?( @ . /, 'price ', '===', ' 10', qw/)] . title/ ],
+    q{$['store']['book'][0]['author']}              => [ '$', '[', q('store'), ']', '[', q('book'), ']', '[', 0, ']', '[', q('author'), ']' ],
+    q{$.[*].user[?(@.login == 'laurilehmijoki')]}   => [ qw/$ . [ * ] . user [?( @ ./,  'login ', '==',  q{ 'laurilehmijoki'}, ')]' ],
 );
 
 for my $expression (keys %EXPRESSIONS) {
