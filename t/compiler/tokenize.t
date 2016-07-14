@@ -1,7 +1,7 @@
 use 5.016;
 
 use Test::Most;
-use JSON::Path::Compiler;
+use JSON::Path::Tokenizer qw(tokenize);
 
 my %EXPRESSIONS = (
     '$.[*].id'                                      => [qw/$ . [ * ] . id/],
@@ -18,7 +18,7 @@ my %EXPRESSIONS = (
 
 for my $expression (keys %EXPRESSIONS) {
     my @tokens;
-    lives_and { is_deeply [ JSON::Path::Compiler::tokenize($expression) ], $EXPRESSIONS{$expression} } qq{Expression "$expression" tokenized correctly};
+    lives_and { is_deeply [ tokenize($expression) ], $EXPRESSIONS{$expression} } qq{Expression "$expression" tokenized correctly};
 }
 
 done_testing;
