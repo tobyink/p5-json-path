@@ -3,8 +3,9 @@ use 5.016;
 use Test::Most;
 use JSON::Path::Compiler;
 use Storable qw(dclone);
+use Tie::IxHash;
 
-my $data = {
+tie my %data, 'Tie::IxHash', (
     simple    => 'Simple',
     hash      => { key => 'value' },
     long_hash => {
@@ -57,19 +58,19 @@ my $data = {
 
         }
     ],
-};
+);
 
 my %EXPRESSIONS = (
 
-    #     '$.simple'                 => [ $data->{simple} ],
-    #     '$.long_hash.key1'         => [ dclone $data->{long_hash}{key1} ],
-    #     '$.long_hash.key1.subkey2' => [ $data->{long_hash}{key1}{subkey2} ],
-    #     q{$.complex_array[0]['foo']} => [ $data->{complex_array}[0]{foo} ],
-    '$.*' => [ map { ref $_ ? dclone $_ : $_  } values %{$data} ],
+    '$.simple'                 => [ $data{simple} ],
+    '$.long_hash.key1'         => [ dclone $data{long_hash}{key1} ],
+    '$.long_hash.key1.subkey2' => [ $data{long_hash}{key1}{subkey2} ],
+    q{$.complex_array[0]['foo']} => [ $data{complex_array}[0]{foo} ],
+    '$.*' => [ map { ref $_ ? dclone $_ : $_  } values %data ],
     '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>
-        [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data->{complex_array} } )[0] ) ],
+        [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data{complex_array} } )[0] ) ],
     '$.complex_array[?(@.weight > 10)]' =>
-        [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data->{complex_array} } ],
+        [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
     '$..foo' => [ qw/bar baz bak/ ],    
 
 #    '$.[*].id'                                      => [qw/$ . [ * ] . id/],
@@ -85,10 +86,11 @@ my %EXPRESSIONS = (
 );
 
 for my $expression (keys %EXPRESSIONS) {
-    #    @JSON::Path::Compiler::TOKEN_STREAM = JSON::Path::Compiler::tokenize($expression);
     is_deeply(
-        [ JSON::Path::Compiler::walk_recursive( dclone $data, [ JSON::Path::Compiler::tokenize($expression) ] ) ],
+        [ JSON::Path::Compiler::walk_recursive( dclone \%data, [ JSON::Path::Compiler::tokenize($expression) ] ) ],
         $EXPRESSIONS{$expression},
         qq{"$expression" evaluated correctly}
     );
 }
+
+done_testing;

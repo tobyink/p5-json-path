@@ -2,14 +2,16 @@ package JSON::Path::Compiler;
 
 use 5.016;
 use Carp;
+use Carp::Assert qw(assert);
 use Readonly;
 use Scalar::Util qw/looks_like_number blessed/;
 use Storable qw/dclone/;
+use Sys::Hostname qw/hostname/;
 our $AUTHORITY = 'cpan:POPEFELIX';
 our $VERSION   = '1.00';
 
-our @TOKEN_STREAM;
-
+my $ASSERT_ENABLE =
+    defined $ENV{ASSERT_ENABLE} ? $ENV{ASSERT_ENABLE} : hostname =~ /^lls.+?[.]cb[.]careerbuilder[.]com/;
 Readonly my $DOLLAR_SIGN          => '$';
 Readonly my $COMMERCIAL_AT        => '@';
 Readonly my $FULL_STOP            => '.';
@@ -91,9 +93,15 @@ my %OPERATORS => (
     $TOKEN_SUBSCRIPT_CLOSE     => 1,
     $TOKEN_UNION               => 1,
     $TOKEN_ARRAY_SLICE         => 1,
+    $TOKEN_SINGLE_EQUAL        => 1,
+    $TOKEN_DOUBLE_EQUAL        => 1,
+    $TOKEN_TRIPLE_EQUAL        => 1,
+    $TOKEN_GREATER_THAN        => 1,
+    $TOKEN_LESS_THAN           => 1,
+    $TOKEN_NOT_EQUAL           => 1,
+    $TOKEN_GREATER_EQUAL       => 1,
+    $TOKEN_LESS_EQUAL          => 1,
 );
-
-my @STACK;
 
 # EXPRESSION                                    TOKENS
 # $.[*].id                                      $ . [ * ] . id
@@ -156,25 +164,25 @@ sub tokenize {
                 my $next_char = shift @chars;
                 no warnings qw/uninitialized/;
                 die qq{Unterminated expression: '[(' or '[?(' without corresponding ')]'\n}
-                unless $next_char eq $RIGHT_SQUARE_BRACKET;
+                    unless $next_char eq $RIGHT_SQUARE_BRACKET;
                 use warnings qw/uninitialized/;
                 $token .= $next_char;
             }
-            elsif ($char eq $EQUAL_SIGN ) { # Build '=', '==', or '===' token as appropriate
+            elsif ( $char eq $EQUAL_SIGN ) {    # Build '=', '==', or '===' token as appropriate
                 my $next_char = shift @chars;
-                if (!defined $next_char) { 
+                if ( !defined $next_char ) {
                     die qq{Unterminated comparison: '=', '==', or '===' without predicate\n};
                 }
-                if ($next_char eq $EQUAL_SIGN) {
+                if ( $next_char eq $EQUAL_SIGN ) {
                     $token .= $next_char;
                     $next_char = shift @chars;
-                    if (!defined $next_char) { 
+                    if ( !defined $next_char ) {
                         die qq{Unterminated comparison: '==' or '===' without predicate\n};
                     }
-                    if ($next_char eq $EQUAL_SIGN) {
+                    if ( $next_char eq $EQUAL_SIGN ) {
                         $token .= $next_char;
                     }
-                    else { 
+                    else {
                         unshift @chars, $next_char;
                     }
                 }
@@ -182,15 +190,15 @@ sub tokenize {
                     unshift @chars, $next_char;
                 }
             }
-            elsif ($char eq $LESS_THAN_SIGN || $char eq $GREATER_THAN_SIGN) {
+            elsif ( $char eq $LESS_THAN_SIGN || $char eq $GREATER_THAN_SIGN ) {
                 my $next_char = shift @chars;
-                if (!defined $next_char) { 
+                if ( !defined $next_char ) {
                     die qq{Unterminated comparison: '=', '==', or '===' without predicate\n};
                 }
-                if ($next_char eq $EQUAL_SIGN) {
+                if ( $next_char eq $EQUAL_SIGN ) {
                     $token .= $next_char;
                 }
-                else { 
+                else {
                     unshift @chars, $next_char;
                 }
             }
@@ -211,134 +219,6 @@ sub tokenize {
     return @tokens;
 }
 
-sub generate_code {
-    my @tokens = reverse @_;
-
-    #    $TOKEN_ROOT                => 1,
-    #    $TOKEN_CURRENT             => 1,
-    #    $TOKEN_CHILD               => 1,
-    #    $TOKEN_RECURSIVE           => 1,
-    #    $TOKEN_ALL                 => 1,
-    #    $TOKEN_FILTER_OPEN         => 1,
-    #    $TOKEN_SCRIPT_OPEN         => 1,
-    #    $TOKEN_FILTER_SCRIPT_CLOSE => 1,
-    #    $TOKEN_SUBSCRIPT_OPEN      => 1,
-    #    $TOKEN_SUBSCRIPT_CLOSE     => 1,
-    #    $TOKEN_UNION               => 1,
-    #    $TOKEN_ARRAY_SLICE         => 1,
-
-    my @stack;
-
-    # TOKEN STREAM:
-    # )] /login="laurilehmijoki"/ . @ [?( user .. $
-    # )] /id == D84002/ . addresstype . @ [?( addresses . $
-    # )] /name==bug/ . @ [?( labels .. $
-    # )] length-1 . @ [( book .. $
-    # author . * . book . store . $
-    # title . 0 . book . store . $
-    while ( defined( my $token = shift @tokens ) ) {
-        if ( $OPERATORS{$token} ) {
-        }
-        if ( $token eq $TOKEN_ROOT ) {
-            last;
-        }
-        elsif ( $token eq $TOKEN_CURRENT ) {
-
-            # TODO
-        }
-        elsif ( $token eq $TOKEN_CHILD ) {
-
-            # assumed
-            next;
-        }
-        elsif ( $token eq $TOKEN_RECURSIVE ) {
-
-            # TODO
-        }
-        elsif ( $token eq $TOKEN_FILTER_SCRIPT_CLOSE ) {
-            my $is_filter;
-
-            # )] /login="laurilehmijoki"/ . @ [?( user .. $
-            # )] /id == D84002/ . addresstype . @ [?( addresses . $
-            # )] /name==bug/ . @ [?( labels .. $
-            # )] length-1 . @ [( book .. $
-            my @filter = shift @tokens;
-
-            while ( defined( $token = shift @tokens ) ) {
-                if ( $token eq $TOKEN_FILTER_OPEN ) {
-                    $is_filter = 1;
-                    last;
-                }
-                elsif ( $token eq $TOKEN_SCRIPT_OPEN ) {
-                    last;
-                }
-                unshift @filter, $token;
-            }
-            1;
-
-            if ($is_filter) {
-                my $expression = pop @filter;
-                my ( $left, $operator, $right ) = (
-                    $expression =~ m/
-                    ([^=!>< ]+)\s*              # Match whatever is on the LHS (excluding operator symbols) and exclude spaces
-                    (==|===|=|!=|!==|>|<|>=|<=) # JS boolean operator list
-                    \s*([^=!>< ]+)              # Match whatever is on the RHS (excluding operator symbols) and exclude spaces
-                    /x
-                );
-                1;
-                push @filter, $left;
-
-                # punt!
-                my $condition;
-                for my $token (@filter) {
-                    if ( $token eq $TOKEN_CURRENT ) {
-                        $condition .= '$_';
-                    }
-                    elsif ( $token eq $TOKEN_CHILD ) {
-                        $condition .= '->';
-                    }
-                    elsif ( $OPERATORS{$token} ) {
-                        die qq{Invalid token "$token" in filter expression "$expression"\n};
-                    }
-                    else {
-                        $condition .= qq({$token});
-                    }
-                }
-                if ( !looks_like_number($right) ) {
-                    $operator = 'eq' if $operator =~ /^=/;
-                    $operator = 'ne' if $operator =~ /^!/;
-                    $operator = 'lt' if $operator eq '<';
-                    $operator = 'gt' if $operator eq '>';
-                    $operator = 'le' if $operator eq '<=';
-                    $operator = 'ge' if $operator eq '>=';
-                }
-                else {
-                    if ( $operator eq '===' ) {
-                        $operator = 'eq';
-                    }
-                    elsif ( $operator eq '!==' ) {
-                        $operator = 'ne';
-                    }
-                }
-                $condition .= qq{ $operator $right};
-                push @stack, sub {
-                    my @items = ref $_[0] eq 'ARRAY' ? @{ $_[0] } : ( $_[0] );
-                    eval qq{grep { $condition } \@items};
-                };
-                ## no critic
-                ## use critic
-                # grep { $_->{addresstype}{id} == ... }
-            }
-        }
-        else {
-            push @stack, sub {
-                my @items = ref $_[0] eq 'ARRAY' ? @{ $_[0] } : ( $_[0] );
-                map { $_->{$token} } @items;
-            };
-        }
-    }
-}
-
 sub _hashlike {
     my $object = shift;
     return ( ref $object eq 'HASH' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'HASH' ) );
@@ -349,9 +229,12 @@ sub _arraylike {
     return ( ref $object eq 'ARRAY' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'ARRAY' ) );
 }
 
+# TODO: normalize the token stream so that I don't have to check for subscript open / close all the time
+#
 my $root;
-sub walk_recursive { # This assumes that the token stream is syntactically valid
-    my ($obj, $token_stream) = @_;
+
+sub walk_recursive {    # This assumes that the token stream is syntactically valid
+    my ( $obj, $token_stream ) = @_;
 
     $root ||= $obj;
     $token_stream ||= [];
@@ -359,137 +242,136 @@ sub walk_recursive { # This assumes that the token stream is syntactically valid
     return $obj unless @{$token_stream};
 
     my @match;
-    while (defined (my $token = shift @{$token_stream})) {
-        next if $token eq $TOKEN_CURRENT;
-        if ($token eq $TOKEN_ROOT) {
-            push @match, walk_recursive($root, $token_stream);
+    while ( defined( my $token = get_token($token_stream) ) ) {
+        next                                       if $token eq $TOKEN_CURRENT;
+        next                                       if $token eq $TOKEN_CHILD;
+        assert( $token ne $TOKEN_SUBSCRIPT_OPEN )  if $ASSERT_ENABLE;
+        assert( $token ne $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
+        if ( $token eq $TOKEN_ROOT ) {
+            push @match, walk_recursive( $root, $token_stream );
         }
-        elsif ($token eq $TOKEN_CURRENT) {
-            #push @match, walk_recursive($obj, $token_stream);
-        }
-        elsif ($token eq $TOKEN_CHILD || $token eq $TOKEN_SUBSCRIPT_OPEN) {
-            my $next_token = shift @{$token_stream};
-            my $index;
-            if ($next_token eq $TOKEN_SUBSCRIPT_OPEN) {
-                $index = shift @{$token_stream};
-                my $close = shift @{$token_stream};
-            }
-            else {
-                $index = $next_token;
-                if ($token eq $TOKEN_SUBSCRIPT_OPEN) {
-                    $next_token = shift @{$token_stream};
-                    unshift @{$token_stream}, $next_token unless $next_token eq $TOKEN_SUBSCRIPT_CLOSE;
-                }
-            }
-
-            $index = normalize($index);
-            if (_arraylike($obj)) {
-                if ($index ne $TOKEN_ALL) {
-                    return unless looks_like_number($index);
-                    push @match, walk_recursive($obj->[$index], $token_stream); 
-                }
-                else { 
-                    return map { walk_recursive($obj->[$_], dclone($token_stream)) } (0 .. $#{$obj});
-                }
-            }
-            else { 
-                confess qq{ASSERTION FAILED! Did not get a hashref, got "$obj"} unless _hashlike($obj);
-                if ($index ne $TOKEN_ALL) {
-                    push @match, walk_recursive($obj->{$index}, $token_stream);
-                }
-                else { 
-                    return map { walk_recursive( $obj->{$_}, dclone($token_stream) ) } values %{$obj};
-                }
-            }
-        }
-        elsif ($token eq $TOKEN_FILTER_OPEN) { 
+        elsif ( $token eq $TOKEN_FILTER_OPEN ) {
             my @sub_stream;
+
             # Build a stream of just the tokens between the filter open and close
-            while (defined (my $token = shift @{$token_stream})) {
+            while ( defined( my $token = shift @{$token_stream} ) ) {
                 last if $token eq $TOKEN_FILTER_SCRIPT_CLOSE;
-                if ($token eq $TOKEN_CURRENT) { 
+                if ( $token eq $TOKEN_CURRENT ) {
                     push @sub_stream, $token, $TOKEN_CHILD, $TOKEN_ALL;
                 }
                 else {
                     push @sub_stream, $token;
                 }
             }
+
             # FIXME: what about [?(@.foo)] ? that's a valid filter
             my $rhs = pop @sub_stream;
             $rhs = normalize($rhs);
-            
+
             my $operator = pop @sub_stream;
-            my @lhs = walk_recursive( $obj, [ @sub_stream] );
+            my @lhs = walk_recursive( $obj, [@sub_stream] );
             for ( 0 .. $#lhs ) {
-                if (compare($operator, $lhs[$_], $rhs)) {
+                if ( compare( $operator, $lhs[$_], $rhs ) ) {
                     push @match, $obj->[$_];
                 }
             }
         }
-        elsif ($token eq $TOKEN_RECURSIVE) {
-            my $index;
-            my $next_token = shift @{$token_stream};
-            if (_arraylike($obj)) {
-                for (0 .. $#{$obj}) {
-                    push @match, $obj->[$_] if $_ eq $index;
+        elsif ( $token eq $TOKEN_RECURSIVE ) {
+            my $index = get_token($token_stream);
+            push @match, _match_recursive( $obj, $index );
+        }
+        else {
+            assert( !$OPERATORS{$token}, qq{"$token" is not an operator} );
+            
+            my $index = $token;
+
+            $index = normalize($index);
+            if ( _arraylike($obj) ) {
+                if ( $index ne $TOKEN_ALL ) {
+                    return unless looks_like_number($index);
+                    push @match, walk_recursive( $obj->[$index], $token_stream );
+                }
+                else {
+                    return map { walk_recursive( $obj->[$_], dclone($token_stream) ) } ( 0 .. $#{$obj} );
                 }
             }
             else {
+                assert( _hashlike($obj) ) if $ASSERT_ENABLE;
+                if ( $index ne $TOKEN_ALL ) {
+                    push @match, walk_recursive( $obj->{$index}, $token_stream );
+                }
+                else {
+                    return map { walk_recursive( $_, dclone($token_stream) ) } values %{$obj};
+                }
             }
         }
     }
     return @match;
 }
 
-sub _match_recursive { 
-    my ($obj, $index) = @_;
+sub get_token {
+    my $token_stream = shift;
+    my $token        = shift @{$token_stream};
+    return unless $token;
+
+    if ( $token eq $TOKEN_SUBSCRIPT_OPEN ) {
+        my $next_token = shift @{$token_stream};
+        my $close      = shift @{$token_stream};
+        assert( $close eq $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
+        return $next_token;
+    }
+    return $token;
+}
+
+sub _match_recursive {
+    my ( $obj, $index ) = @_;
     my @match;
-    if (_arraylike($obj)) {
-        for (0 .. $#{$obj}) {
+    if ( _arraylike($obj) ) {
+        for ( 0 .. $#{$obj} ) {
             push @match, $obj->[$_] if $_ eq $index;
-            push @match, _match_recursive($obj->[$_], $index);
+            push @match, _match_recursive( $obj->[$_], $index );
         }
     }
-    elsif (_hashlike($obj)) {
+    elsif ( _hashlike($obj) ) {
         push @match, $obj->{$index} if exists $obj->{$index};
-        push @match, _match_recursive($_, $index) for values %{$obj};
+        push @match, _match_recursive( $_, $index ) for values %{$obj};
     }
     return @match;
 }
 
 sub normalize {
     my $string = shift;
-            
+
     # NB: Stripping spaces *before* stripping quotes allows the caller to quote spaces in an index.
-    # So an index of 'foo ' will be correctly normalized as 'foo', but '"foo "' will normalize to 'foo '. 
-    $string =~ s/\s+$//; # trim trailing spaces
-    $string =~ s/^\s+//; # trim leading spaces
-    $string =~ s/^['"](.+)['"]$/$1/; # Strip quotes from index
+    # So an index of 'foo ' will be correctly normalized as 'foo', but '"foo "' will normalize to 'foo '.
+    $string =~ s/\s+$//;                # trim trailing spaces
+    $string =~ s/^\s+//;                # trim leading spaces
+    $string =~ s/^['"](.+)['"]$/$1/;    # Strip quotes from index
     return $string;
 }
 
 sub compare {
-    my ($operator, $lhs, $rhs) = @_;
+    my ( $operator, $lhs, $rhs ) = @_;
 
     my $use_numeric = looks_like_number($lhs) && looks_like_number($rhs);
-    
-    if ($operator eq '=' || $operator eq '==' || $operator eq '===') {
-        return $use_numeric ? ($lhs == $rhs) : $lhs eq $rhs;
+
+    if ( $operator eq '=' || $operator eq '==' || $operator eq '===' ) {
+        return $use_numeric ? ( $lhs == $rhs ) : $lhs eq $rhs;
     }
-    if ($operator eq '<') {
-        return $use_numeric ? ($lhs < $rhs) : $lhs lt $rhs;
+    if ( $operator eq '<' ) {
+        return $use_numeric ? ( $lhs < $rhs ) : $lhs lt $rhs;
     }
-    if ($operator eq '>') {
-        return $use_numeric ? ($lhs > $rhs) : $lhs gt $rhs;
+    if ( $operator eq '>' ) {
+        return $use_numeric ? ( $lhs > $rhs ) : $lhs gt $rhs;
     }
-    if ($operator eq '<=') {
-        return $use_numeric ? ($lhs <= $rhs) : $lhs le $rhs;
+    if ( $operator eq '<=' ) {
+        return $use_numeric ? ( $lhs <= $rhs ) : $lhs le $rhs;
     }
-    if ($operator eq '>=') {
-        return $use_numeric ? ($lhs >= $rhs) : $lhs ge $rhs;
+    if ( $operator eq '>=' ) {
+        return $use_numeric ? ( $lhs >= $rhs ) : $lhs ge $rhs;
     }
-    if ($operator eq '!=' || $operator eq '!==') { 
-        return $use_numeric ? ($lhs != $rhs) : $lhs ne $rhs;
+    if ( $operator eq '!=' || $operator eq '!==' ) {
+        return $use_numeric ? ( $lhs != $rhs ) : $lhs ne $rhs;
     }
 }
 1;
