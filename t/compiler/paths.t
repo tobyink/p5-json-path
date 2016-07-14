@@ -85,9 +85,9 @@ my %EXPRESSIONS = (
 #    q{$.[*].user[?(@.login == 'laurilehmijoki')]}   => [ qw/$ . [ * ] . user [?( @ ./,  'login ', '==',  q{ 'laurilehmijoki'}, ')]' ],
 );
 
-for my $expression (keys %EXPRESSIONS) {
+for my $expression ( keys %EXPRESSIONS ) {
     is_deeply(
-        [ JSON::Path::Compiler::walk_recursive( dclone \%data, [ JSON::Path::Compiler::tokenize($expression) ] ) ],
+        [ JSON::Path::Compiler::evaluate( dclone \%data, $expression ) ],
         $EXPRESSIONS{$expression},
         qq{"$expression" evaluated correctly}
     );

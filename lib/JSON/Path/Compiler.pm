@@ -3,6 +3,8 @@ package JSON::Path::Compiler;
 use 5.016;
 use Carp;
 use Carp::Assert qw(assert);
+use JSON::Path::Constants qw(:operators);
+use JSON::Path::Tokenizer qw(tokenize);
 use Readonly;
 use Scalar::Util qw/looks_like_number blessed/;
 use Storable qw/dclone/;
@@ -12,42 +14,15 @@ our $VERSION   = '1.00';
 
 my $ASSERT_ENABLE =
     defined $ENV{ASSERT_ENABLE} ? $ENV{ASSERT_ENABLE} : hostname =~ /^lls.+?[.]cb[.]careerbuilder[.]com/;
-Readonly my $DOLLAR_SIGN          => '$';
-Readonly my $COMMERCIAL_AT        => '@';
-Readonly my $FULL_STOP            => '.';
-Readonly my $LEFT_SQUARE_BRACKET  => '[';
-Readonly my $RIGHT_SQUARE_BRACKET => ']';
-Readonly my $ASTERISK             => '*';
-Readonly my $COLON                => ':';
-Readonly my $LEFT_PARENTHESIS     => '(';
-Readonly my $RIGHT_PARENTHESIS    => ')';
-Readonly my $COMMA                => ',';
-Readonly my $QUESTION_MARK        => '?';
-Readonly my $EQUAL_SIGN           => '=';
-Readonly my $EXCLAMATION_MARK     => '!';
-Readonly my $GREATER_THAN_SIGN    => '>';
-Readonly my $LESS_THAN_SIGN       => '<';
 
-Readonly my $TOKEN_ROOT                => $DOLLAR_SIGN;
-Readonly my $TOKEN_CURRENT             => $COMMERCIAL_AT;
-Readonly my $TOKEN_CHILD               => $FULL_STOP;
-Readonly my $TOKEN_RECURSIVE           => $FULL_STOP . $FULL_STOP;
-Readonly my $TOKEN_ALL                 => $ASTERISK;
-Readonly my $TOKEN_FILTER_OPEN         => $LEFT_SQUARE_BRACKET . $QUESTION_MARK . $LEFT_PARENTHESIS;
-Readonly my $TOKEN_SCRIPT_OPEN         => $LEFT_SQUARE_BRACKET . $LEFT_PARENTHESIS;
-Readonly my $TOKEN_FILTER_SCRIPT_CLOSE => $RIGHT_PARENTHESIS . $RIGHT_SQUARE_BRACKET;
-Readonly my $TOKEN_SUBSCRIPT_OPEN      => $LEFT_SQUARE_BRACKET;
-Readonly my $TOKEN_SUBSCRIPT_CLOSE     => $RIGHT_SQUARE_BRACKET;
-Readonly my $TOKEN_UNION               => $COMMA;
-Readonly my $TOKEN_ARRAY_SLICE         => $COLON;
-Readonly my $TOKEN_SINGLE_EQUAL        => $EQUAL_SIGN;
-Readonly my $TOKEN_DOUBLE_EQUAL        => $EQUAL_SIGN . $EQUAL_SIGN;
-Readonly my $TOKEN_TRIPLE_EQUAL        => $EQUAL_SIGN . $EQUAL_SIGN . $EQUAL_SIGN;
-Readonly my $TOKEN_GREATER_THAN        => $GREATER_THAN_SIGN;
-Readonly my $TOKEN_LESS_THAN           => $LESS_THAN_SIGN;
-Readonly my $TOKEN_NOT_EQUAL           => $EXCLAMATION_MARK . $EQUAL_SIGN;
-Readonly my $TOKEN_GREATER_EQUAL       => $GREATER_THAN_SIGN . $EQUAL_SIGN;
-Readonly my $TOKEN_LESS_EQUAL          => $LESS_THAN_SIGN . $EQUAL_SIGN;
+sub _new { 
+    my $class = shift;
+    my %args = ref $_[0] eq 'HASH' ? %{$_[0]} : @_;
+    my $self = {};
+    $self->{root} = $args{root};
+    bless $self, $class;
+    return $self;
+}
 
 # JSONPath              Function
 # $                     the root object/element
@@ -62,23 +37,6 @@ Readonly my $TOKEN_LESS_EQUAL          => $LESS_THAN_SIGN . $EQUAL_SIGN;
 # ()                    script expression, using the underlying script engine.
 #
 # With JSONPath square brackets operate on the object or array addressed by the previous path fragment. Indices always start by 0.
-
-my %RESERVED_SYMBOLS = (
-    $DOLLAR_SIGN          => 1,
-    $COMMERCIAL_AT        => 1,
-    $FULL_STOP            => 1,
-    $LEFT_SQUARE_BRACKET  => 1,
-    $RIGHT_SQUARE_BRACKET => 1,
-    $ASTERISK             => 1,
-    $COLON                => 1,
-    $LEFT_PARENTHESIS     => 1,
-    $RIGHT_PARENTHESIS    => 1,
-    $COMMA                => 1,
-    $EQUAL_SIGN           => 1,
-    $EXCLAMATION_MARK     => 1,
-    $GREATER_THAN_SIGN    => 1,
-    $LESS_THAN_SIGN       => 1,
-);
 
 my %OPERATORS => (
     $TOKEN_ROOT                => 1,
@@ -118,107 +76,6 @@ my %OPERATORS => (
 # $['store']['book'][3]['author']
 #
 
-# Take an expression and break it up into tokens
-sub tokenize {
-    my $expression = shift;
-
-    # $expression = normalize($expression);
-    my @tokens;
-    my @chars = split //, $expression;
-    my $char;
-    while ( defined( my $char = shift @chars ) ) {
-        my $token = $char;
-        if ( $RESERVED_SYMBOLS{$char} ) {
-            if ( $char eq $FULL_STOP ) {    # distinguish between the '.' and '..' tokens
-                my $next_char = shift @chars;
-                if ( $next_char eq $FULL_STOP ) {
-                    $token .= $next_char;
-                }
-                else {
-                    unshift @chars, $next_char;
-                }
-            }
-            elsif ( $char eq $LEFT_SQUARE_BRACKET ) {
-                my $next_char = shift @chars;
-
-                # $.addresses[?(@.addresstype.id == D84002)]
-
-                if ( $next_char eq $LEFT_PARENTHESIS ) {
-                    $token .= $next_char;
-                }
-                elsif ( $next_char eq $QUESTION_MARK ) {
-                    $token .= $next_char;
-                    my $next_char = shift @chars;
-                    if ( $next_char eq $LEFT_PARENTHESIS ) {
-                        $token .= $next_char;
-                    }
-                    else {
-                        die qq{filter operator "$token" must be followed by '('\n};
-                    }
-                }
-                else {
-                    unshift @chars, $next_char;
-                }
-            }
-            elsif ( $char eq $RIGHT_PARENTHESIS ) {
-                my $next_char = shift @chars;
-                no warnings qw/uninitialized/;
-                die qq{Unterminated expression: '[(' or '[?(' without corresponding ')]'\n}
-                    unless $next_char eq $RIGHT_SQUARE_BRACKET;
-                use warnings qw/uninitialized/;
-                $token .= $next_char;
-            }
-            elsif ( $char eq $EQUAL_SIGN ) {    # Build '=', '==', or '===' token as appropriate
-                my $next_char = shift @chars;
-                if ( !defined $next_char ) {
-                    die qq{Unterminated comparison: '=', '==', or '===' without predicate\n};
-                }
-                if ( $next_char eq $EQUAL_SIGN ) {
-                    $token .= $next_char;
-                    $next_char = shift @chars;
-                    if ( !defined $next_char ) {
-                        die qq{Unterminated comparison: '==' or '===' without predicate\n};
-                    }
-                    if ( $next_char eq $EQUAL_SIGN ) {
-                        $token .= $next_char;
-                    }
-                    else {
-                        unshift @chars, $next_char;
-                    }
-                }
-                else {
-                    unshift @chars, $next_char;
-                }
-            }
-            elsif ( $char eq $LESS_THAN_SIGN || $char eq $GREATER_THAN_SIGN ) {
-                my $next_char = shift @chars;
-                if ( !defined $next_char ) {
-                    die qq{Unterminated comparison: '=', '==', or '===' without predicate\n};
-                }
-                if ( $next_char eq $EQUAL_SIGN ) {
-                    $token .= $next_char;
-                }
-                else {
-                    unshift @chars, $next_char;
-                }
-            }
-        }
-        else {
-            # Read from the character stream until we have a valid token
-            while ( defined( $char = shift @chars ) ) {
-                if ( $RESERVED_SYMBOLS{$char} ) {
-                    unshift @chars, $char;
-                    last;
-                }
-                $token .= $char;
-            }
-        }
-        push @tokens, $token;
-    }
-
-    return @tokens;
-}
-
 sub _hashlike {
     my $object = shift;
     return ( ref $object eq 'HASH' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'HASH' ) );
@@ -229,14 +86,16 @@ sub _arraylike {
     return ( ref $object eq 'ARRAY' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'ARRAY' ) );
 }
 
-# TODO: normalize the token stream so that I don't have to check for subscript open / close all the time
-#
-my $root;
+sub evaluate { 
+    my ( $json_object, $expression ) = @_;
 
-sub walk_recursive {    # This assumes that the token stream is syntactically valid
-    my ( $obj, $token_stream ) = @_;
+    my $self = __PACKAGE__->_new( root => $json_object );
+    return $self->_evaluate( $json_object, [ tokenize($expression) ] );
+}
 
-    $root ||= $obj;
+sub _evaluate {    # This assumes that the token stream is syntactically valid
+    my ( $self, $obj, $token_stream ) = @_;
+
     $token_stream ||= [];
 
     return $obj unless @{$token_stream};
@@ -248,7 +107,7 @@ sub walk_recursive {    # This assumes that the token stream is syntactically va
         assert( $token ne $TOKEN_SUBSCRIPT_OPEN )  if $ASSERT_ENABLE;
         assert( $token ne $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
         if ( $token eq $TOKEN_ROOT ) {
-            push @match, walk_recursive( $root, $token_stream );
+            push @match, $self->_evaluate( $self->{root}, $token_stream );
         }
         elsif ( $token eq $TOKEN_FILTER_OPEN ) {
             my @sub_stream;
@@ -269,7 +128,7 @@ sub walk_recursive {    # This assumes that the token stream is syntactically va
             $rhs = normalize($rhs);
 
             my $operator = pop @sub_stream;
-            my @lhs = walk_recursive( $obj, [@sub_stream] );
+            my @lhs = $self->_evaluate( $obj, [@sub_stream] );
             for ( 0 .. $#lhs ) {
                 if ( compare( $operator, $lhs[$_], $rhs ) ) {
                     push @match, $obj->[$_];
@@ -289,19 +148,19 @@ sub walk_recursive {    # This assumes that the token stream is syntactically va
             if ( _arraylike($obj) ) {
                 if ( $index ne $TOKEN_ALL ) {
                     return unless looks_like_number($index);
-                    push @match, walk_recursive( $obj->[$index], $token_stream );
+                    push @match, $self->_evaluate( $obj->[$index], $token_stream );
                 }
                 else {
-                    return map { walk_recursive( $obj->[$_], dclone($token_stream) ) } ( 0 .. $#{$obj} );
+                    return map { $self->_evaluate( $obj->[$_], dclone($token_stream) ) } ( 0 .. $#{$obj} );
                 }
             }
             else {
                 assert( _hashlike($obj) ) if $ASSERT_ENABLE;
                 if ( $index ne $TOKEN_ALL ) {
-                    push @match, walk_recursive( $obj->{$index}, $token_stream );
+                    push @match, $self->_evaluate( $obj->{$index}, $token_stream );
                 }
                 else {
-                    return map { walk_recursive( $_, dclone($token_stream) ) } values %{$obj};
+                    return map { $self->_evaluate( $_, dclone($token_stream) ) } values %{$obj};
                 }
             }
         }
