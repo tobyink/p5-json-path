@@ -15,10 +15,10 @@ our $VERSION   = '1.00';
 my $ASSERT_ENABLE =
     defined $ENV{ASSERT_ENABLE} ? $ENV{ASSERT_ENABLE} : hostname =~ /^lls.+?[.]cb[.]careerbuilder[.]com/;
 
-sub _new { 
+sub _new {
     my $class = shift;
-    my %args = ref $_[0] eq 'HASH' ? %{$_[0]} : @_;
-    my $self = {};
+    my %args  = ref $_[0] eq 'HASH' ? %{ $_[0] } : @_;
+    my $self  = {};
     $self->{root} = $args{root};
     bless $self, $class;
     return $self;
@@ -86,7 +86,7 @@ sub _arraylike {
     return ( ref $object eq 'ARRAY' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'ARRAY' ) );
 }
 
-sub evaluate { 
+sub evaluate {
     my ( $json_object, $expression ) = @_;
 
     my $self = __PACKAGE__->_new( root => $json_object );
@@ -100,14 +100,13 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
     return $obj unless @{$token_stream};
 
-    my @match;
     while ( defined( my $token = get_token($token_stream) ) ) {
         next                                       if $token eq $TOKEN_CURRENT;
         next                                       if $token eq $TOKEN_CHILD;
         assert( $token ne $TOKEN_SUBSCRIPT_OPEN )  if $ASSERT_ENABLE;
         assert( $token ne $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
         if ( $token eq $TOKEN_ROOT ) {
-            push @match, $self->_evaluate( $self->{root}, $token_stream );
+            return $self->_evaluate( $self->{root}, $token_stream );
         }
         elsif ( $token eq $TOKEN_FILTER_OPEN ) {
             my @sub_stream;
@@ -128,27 +127,31 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             $rhs = normalize($rhs);
 
             my $operator = pop @sub_stream;
+
+            # Evaluate the left hand side of the comparison first
             my @lhs = $self->_evaluate( $obj, [@sub_stream] );
-            for ( 0 .. $#lhs ) {
-                if ( compare( $operator, $lhs[$_], $rhs ) ) {
-                    push @match, $obj->[$_];
-                }
-            }
+
+            # FIXME: What if $obj is not an array?
+            # Evaluate the token stream on all elements that pass the comparison in compare()
+            my @ret = map { $self->_evaluate( $obj->[$_], dclone($token_stream) ) }
+                grep { compare( $operator, $lhs[$_], $rhs ) } ( 0 .. $#lhs );    # returns indexes that pass compare()
+            return @ret;
         }
         elsif ( $token eq $TOKEN_RECURSIVE ) {
             my $index = get_token($token_stream);
-            push @match, _match_recursive( $obj, $index );
+            my @ret = map { $self->_evaluate( $_, dclone($token_stream) ) } _match_recursive( $obj, $index );
+            return @ret;
         }
         else {
             assert( !$OPERATORS{$token}, qq{"$token" is not an operator} );
-            
+
             my $index = $token;
 
             $index = normalize($index);
             if ( _arraylike($obj) ) {
                 if ( $index ne $TOKEN_ALL ) {
                     return unless looks_like_number($index);
-                    push @match, $self->_evaluate( $obj->[$index], $token_stream );
+                    return $self->_evaluate( $obj->[$index], $token_stream );
                 }
                 else {
                     return map { $self->_evaluate( $obj->[$_], dclone($token_stream) ) } ( 0 .. $#{$obj} );
@@ -157,7 +160,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             else {
                 assert( _hashlike($obj) ) if $ASSERT_ENABLE;
                 if ( $index ne $TOKEN_ALL ) {
-                    push @match, $self->_evaluate( $obj->{$index}, $token_stream );
+                    return $self->_evaluate( $obj->{$index}, $token_stream );
                 }
                 else {
                     return map { $self->_evaluate( $_, dclone($token_stream) ) } values %{$obj};
@@ -165,7 +168,6 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             }
         }
     }
-    return @match;
 }
 
 sub get_token {
