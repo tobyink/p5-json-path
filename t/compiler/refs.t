@@ -62,57 +62,61 @@ tie my %data, 'Tie::IxHash', (
 );
 
 my %EXPRESSIONS = (
-    '$.simple'                   => sub { 
-        my ($refs, $obj) = @_;
+    '$.simple' => sub {
+        my ( $refs, $obj ) = @_;
         my ($ref) = @{$refs};
         my $expected = int rand 1000;
         is ref $ref, 'SCALAR', q{Reftype OK};
         ${$ref} = $expected;
         is $obj->{simple}, $expected, q{Value OK};
     },
-    '$.long_hash.key1'           => sub {
-        my ($refs, $obj) = @_;
+    '$.long_hash.key1' => sub {
+        my ( $refs, $obj ) = @_;
         my ($ref) = @{$refs};
         is ref $ref, 'HASH', q{Reftype OK};
         my $key = sprintf 'abc%d', int rand 1000;
         $ref->{$key} = 'foo';
         is $obj->{long_hash}{key1}{$key}, 'foo', q{Value OK};
     },
-    '$.long_hash.key1.subkey2'   => sub {
-        my ($refs, $obj) = @_;
+    '$.long_hash.key1.subkey2' => sub {
+        my ( $refs, $obj ) = @_;
         my ($ref) = @{$refs};
         my $expected = int rand 1000;
         is ref $ref, 'SCALAR', q{Reftype OK};
         ${$ref} = $expected;
         is $obj->{long_hash}{key1}{subkey2}, $expected, q{Value OK};
     },
-    '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>sub { 
-        my ($refs, $obj) = @_;
+    '$.complex_array[?(@.type.code=="CODE_ALPHA")]' => sub {
+        my ( $refs, $obj ) = @_;
         my ($ref) = @{$refs};
 
         is ref $ref, 'HASH', q{reftype OK};
         my $key = sprintf 'abc%d', int rand 1000;
         $ref->{$key} = 'foo';
-        my ($code_alpha) = grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $obj->{complex_array} }; 
-        is  $ref->{$key}, $code_alpha->{$key}, q{Value OK};
+        my ($code_alpha) = grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $obj->{complex_array} };
+        is $ref->{$key}, $code_alpha->{$key}, q{Value OK};
     },
-    '$..foo' => sub { 
-        my ($refs, $obj) = @_;
-        for (0 .. $#{$refs}) { 
-            my $ref = $refs->[$_];
+    '$..foo' => sub {
+        my ( $refs, $obj ) = @_;
+        for ( 0 .. $#{$refs} ) {
+            my $ref      = $refs->[$_];
             my $expected = int rand 1000;
             is ref $ref, 'SCALAR', qq{Reftype $_ OK};
             ${$ref} = $expected;
             is $obj->{complex_array}[$_]{foo}, $expected, qq{Value $_ OK};
         }
     },
+    '$..nonexistent' => sub {
+        my ( $refs, $obj ) = @_;
+        is scalar @{$refs}, 0, 'Nonexistent path gives nothing back';
+    },
 );
 
 for my $expression ( keys %EXPRESSIONS ) {
-    my $obj = dclone(\%data);
+    my $obj = dclone( \%data );
     my (@refs) = JSON::Path::Compiler::evaluate( $obj, $expression, 1 );
     my $test = $EXPRESSIONS{$expression};
-    subtest $expression => sub { $test->(\@refs, $obj); };
+    subtest $expression => sub { $test->( \@refs, $obj ); };
 }
 
 done_testing;
