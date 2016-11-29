@@ -39,26 +39,26 @@ sub _new {
 # With JSONPath square brackets operate on the object or array addressed by the previous path fragment. Indices always start by 0.
 
 my %OPERATORS => (
-    $TOKEN_ROOT                => 1,
-    $TOKEN_CURRENT             => 1,
-    $TOKEN_CHILD               => 1,
-    $TOKEN_RECURSIVE           => 1,
-    $TOKEN_ALL                 => 1,
-    $TOKEN_FILTER_OPEN         => 1,
-    $TOKEN_SCRIPT_OPEN         => 1,
-    $TOKEN_FILTER_SCRIPT_CLOSE => 1,
-    $TOKEN_SUBSCRIPT_OPEN      => 1,
-    $TOKEN_SUBSCRIPT_CLOSE     => 1,
-    $TOKEN_UNION               => 1,
-    $TOKEN_ARRAY_SLICE         => 1,
-    $TOKEN_SINGLE_EQUAL        => 1,
-    $TOKEN_DOUBLE_EQUAL        => 1,
-    $TOKEN_TRIPLE_EQUAL        => 1,
-    $TOKEN_GREATER_THAN        => 1,
-    $TOKEN_LESS_THAN           => 1,
-    $TOKEN_NOT_EQUAL           => 1,
-    $TOKEN_GREATER_EQUAL       => 1,
-    $TOKEN_LESS_EQUAL          => 1,
+    $TOKEN_ROOT                => 1, # $
+    $TOKEN_CURRENT             => 1, # @
+    $TOKEN_CHILD               => 1, # . OR []
+    $TOKEN_RECURSIVE           => 1, # ..
+    $TOKEN_ALL                 => 1, # *
+    $TOKEN_FILTER_OPEN         => 1, # ?(
+    $TOKEN_SCRIPT_OPEN         => 1, # (
+    $TOKEN_FILTER_SCRIPT_CLOSE => 1, # )
+    $TOKEN_SUBSCRIPT_OPEN      => 1, # [
+    $TOKEN_SUBSCRIPT_CLOSE     => 1, # ]
+    $TOKEN_UNION               => 1, # ,
+    $TOKEN_ARRAY_SLICE         => 1, # [ start:end:step ]
+    $TOKEN_SINGLE_EQUAL        => 1, # =
+    $TOKEN_DOUBLE_EQUAL        => 1, # ==
+    $TOKEN_TRIPLE_EQUAL        => 1, # ===
+    $TOKEN_GREATER_THAN        => 1, # >
+    $TOKEN_LESS_THAN           => 1, # <
+    $TOKEN_NOT_EQUAL           => 1, # !=
+    $TOKEN_GREATER_EQUAL       => 1, # >=
+    $TOKEN_LESS_EQUAL          => 1, # <=
 );
 
 # EXPRESSION                                    TOKENS
@@ -87,18 +87,25 @@ sub _arraylike {
 }
 
 sub evaluate {
-    my ( $json_object, $expression ) = @_;
+    my ( $json_object, $expression, $want_ref ) = @_;
 
     my $self = __PACKAGE__->_new( root => $json_object );
-    return $self->_evaluate( $json_object, [ tokenize($expression) ] );
+    return $self->_evaluate( $json_object, [ tokenize($expression) ], $want_ref );
 }
 
 sub _evaluate {    # This assumes that the token stream is syntactically valid
-    my ( $self, $obj, $token_stream ) = @_;
+    my ( $self, $obj, $token_stream, $want_ref ) = @_;
 
     $token_stream ||= [];
 
-    return $obj unless @{$token_stream};
+    if ( !@{$token_stream} ) {
+        if ( !ref $obj ) {
+            return $want_ref ? \$obj : $obj;
+        }
+        else {   # Not sure about the dclone here... 
+            return $want_ref ? $obj : dclone($obj);
+        }
+    }
 
     while ( defined( my $token = get_token($token_stream) ) ) {
         next                                       if $token eq $TOKEN_CURRENT;
@@ -106,7 +113,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
         assert( $token ne $TOKEN_SUBSCRIPT_OPEN )  if $ASSERT_ENABLE;
         assert( $token ne $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
         if ( $token eq $TOKEN_ROOT ) {
-            return $self->_evaluate( $self->{root}, $token_stream );
+            return $self->_evaluate( $self->{root}, $token_stream, $want_ref );
         }
         elsif ( $token eq $TOKEN_FILTER_OPEN ) {
             my @sub_stream;
@@ -128,18 +135,21 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
             my $operator = pop @sub_stream;
 
-            # Evaluate the left hand side of the comparison first
+            # Evaluate the left hand side of the comparison first. NOTE: We DO NOT want to set $want_ref here.
             my @lhs = $self->_evaluate( $obj, [@sub_stream] );
 
             # FIXME: What if $obj is not an array?
+            
+            # get indexes that pass compare()
+            my @matching = grep { compare( $operator, $lhs[$_], $rhs ) } ( 0 .. $#lhs );    
+            
             # Evaluate the token stream on all elements that pass the comparison in compare()
-            my @ret = map { $self->_evaluate( $obj->[$_], dclone($token_stream) ) }
-                grep { compare( $operator, $lhs[$_], $rhs ) } ( 0 .. $#lhs );    # returns indexes that pass compare()
+            my @ret = map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } @matching;
             return @ret;
         }
         elsif ( $token eq $TOKEN_RECURSIVE ) {
             my $index = get_token($token_stream);
-            my @ret = map { $self->_evaluate( $_, dclone($token_stream) ) } _match_recursive( $obj, $index );
+            my @ret = map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } _match_recursive( $obj, $index, $want_ref );
             return @ret;
         }
         else {
@@ -154,13 +164,17 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                     return $self->_evaluate( $obj->[$index], $token_stream );
                 }
                 else {
-                    return map { $self->_evaluate( $obj->[$_], dclone($token_stream) ) } ( 0 .. $#{$obj} );
+                    return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } ( 0 .. $#{$obj} );
                 }
             }
             else {
                 assert( _hashlike($obj) ) if $ASSERT_ENABLE;
                 if ( $index ne $TOKEN_ALL ) {
-                    return $self->_evaluate( $obj->{$index}, $token_stream );
+                    # If we have found a scalar at the end of the path but we want a ref, pass a reference to 
+                    # that scalar.
+                    my $to_evaluate = ($want_ref && ! ref $obj->{$index}) ? \($obj->{$index}) : $obj->{$index};
+
+                    return $self->_evaluate( $to_evaluate, $token_stream, $want_ref );
                 }
                 else {
                     return map { $self->_evaluate( $_, dclone($token_stream) ) } values %{$obj};
@@ -185,17 +199,17 @@ sub get_token {
 }
 
 sub _match_recursive {
-    my ( $obj, $index ) = @_;
+    my ( $obj, $index, $want_ref ) = @_;
     my @match;
     if ( _arraylike($obj) ) {
         for ( 0 .. $#{$obj} ) {
-            push @match, $obj->[$_] if $_ eq $index;
-            push @match, _match_recursive( $obj->[$_], $index );
+            push @match, $want_ref ? \($obj->[$_]) : $obj->[$_] if $_ eq $index;
+            push @match, _match_recursive( $obj->[$_], $index, $want_ref );
         }
     }
     elsif ( _hashlike($obj) ) {
-        push @match, $obj->{$index} if exists $obj->{$index};
-        push @match, _match_recursive( $_, $index ) for values %{$obj};
+        push @match, $want_ref ? \($obj->{$index}) : $obj->{$index} if exists $obj->{$index};
+        push @match, _match_recursive( $_, $index, $want_ref ) for values %{$obj};
     }
     return @match;
 }

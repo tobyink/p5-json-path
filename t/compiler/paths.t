@@ -62,19 +62,21 @@ tie my %data, 'Tie::IxHash', (
 );
 
 my %EXPRESSIONS = (
-        '$.simple'                 => [ $data{simple} ],
-        '$.long_hash.key1'         => [ dclone $data{long_hash}{key1} ],
-        '$.long_hash.key1.subkey2' => [ $data{long_hash}{key1}{subkey2} ],
-        q{$.complex_array[0]['foo']} => [ $data{complex_array}[0]{foo} ],
-        '$.*' => [ map { ref $_ ? dclone $_ : $_  } values %data ],
-        '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>
-            [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data{complex_array} } )[0] ) ],
-        '$.complex_array[?(@.weight > 10)]' =>
-            [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
-        '$..foo' => [ qw/bar baz bak/ ],    
+    '$.simple'                   => [ $data{simple} ],
+    '$.long_hash.key1'           => [ dclone $data{long_hash}{key1} ],
+    '$.long_hash.key1.subkey2'   => [ $data{long_hash}{key1}{subkey2} ],
+    q{$.complex_array[0]['foo']} => [ $data{complex_array}[0]{foo} ],
+    '$.*'                        => [ map { ref $_ ? dclone $_ : $_ } values %data ],
+    '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>
+        [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data{complex_array} } )[0] ) ],
+    '$.complex_array[?(@.weight > 10)]' => [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
+    '$..foo' => [qw/bar baz bak/],
     '$.complex_array[?(@.weight > 10)].classification.quux' =>
         [ map { $_->{classification}{quux} } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
-    '$..key2.subkey1' => [ '2value1' ],
+    '$..key2.subkey1' => ['2value1'],
+    '$..complex_array[?(@.weight > 10)].classification.quux' =>
+        [ map { $_->{classification}{quux} } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
+        #    '$..classi
 
 #    '$.[*].id'                                      => [qw/$ . [ * ] . id/],
 #    q{$.[0].title}                                  => [qw/$ . [ 0 ] . title/],
