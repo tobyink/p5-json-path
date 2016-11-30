@@ -32,6 +32,7 @@ tie my %data, 'Tie::IxHash', (
                 quuy => 'omicron',
             },
             weight => 20,
+            quux => 1,
         },
         {   type => {
                 code => 'CODE_BETA',
@@ -43,7 +44,7 @@ tie my %data, 'Tie::IxHash', (
                 quuy => 'nu',
             },
             weight => 10,
-
+            quux => 0,
         },
         {   type => {
                 code => 'CODE_GAMMA',
@@ -67,6 +68,7 @@ my %EXPRESSIONS = (
     '$.long_hash.key1.subkey2'   => [ $data{long_hash}{key1}{subkey2} ],
     q{$.complex_array[0]['foo']} => [ $data{complex_array}[0]{foo} ],
     '$.*'                        => [ map { ref $_ ? dclone $_ : $_ } values %data ],
+    '$.complex_array[?(@.quux)]' => [ grep { $_->{quux} } @{$data{complex_array}} ],
     '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>
         [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data{complex_array} } )[0] ) ],
     '$.complex_array[?(@.weight > 10)]' => [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],

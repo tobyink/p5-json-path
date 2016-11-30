@@ -32,6 +32,7 @@ tie my %data, 'Tie::IxHash', (
                 quuy => 'omicron',
             },
             weight => 20,
+            quux => 1,
         },
         {   type => {
                 code => 'CODE_BETA',
@@ -43,6 +44,7 @@ tie my %data, 'Tie::IxHash', (
                 quuy => 'nu',
             },
             weight => 10,
+            quux => 0,
 
         },
         {   type => {
@@ -95,6 +97,18 @@ my %EXPRESSIONS = (
         $ref->{$key} = 'foo';
         my ($code_alpha) = grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $obj->{complex_array} };
         is $ref->{$key}, $code_alpha->{$key}, q{Value OK};
+    },
+    '$.complex_array[?(@.quux)]' => sub { 
+        my ( $refs, $obj ) = @_;
+        my @expected_refs = grep { $_->{quux} } @{$obj->{complex_array}};
+        for (0 .. $#{$refs}) { 
+            my $ref      = $refs->[$_];
+            is ref $ref, 'HASH', qq{Reftype $_ OK};
+            
+            my $key = sprintf 'abc%d', int rand 1000;
+            $ref->{$key} = 'foo';
+            is $expected_refs[$_]->{$key}, 'foo', q{Value OK};
+        }
     },
     '$..foo' => sub {
         my ( $refs, $obj ) = @_;

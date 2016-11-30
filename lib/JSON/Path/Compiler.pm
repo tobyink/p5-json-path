@@ -12,6 +12,8 @@ use Sys::Hostname qw/hostname/;
 our $AUTHORITY = 'cpan:POPEFELIX';
 our $VERSION   = '1.00';
 
+my $OPERATOR_IS_TRUE = 'IS_TRUE';
+
 my $ASSERT_ENABLE =
     defined $ENV{ASSERT_ENABLE} ? $ENV{ASSERT_ENABLE} : hostname =~ /^lls.+?[.]cb[.]careerbuilder[.]com/;
 
@@ -39,26 +41,26 @@ sub _new {
 # With JSONPath square brackets operate on the object or array addressed by the previous path fragment. Indices always start by 0.
 
 my %OPERATORS => (
-    $TOKEN_ROOT                => 1, # $
-    $TOKEN_CURRENT             => 1, # @
-    $TOKEN_CHILD               => 1, # . OR []
-    $TOKEN_RECURSIVE           => 1, # ..
-    $TOKEN_ALL                 => 1, # *
-    $TOKEN_FILTER_OPEN         => 1, # ?(
-    $TOKEN_SCRIPT_OPEN         => 1, # (
-    $TOKEN_FILTER_SCRIPT_CLOSE => 1, # )
-    $TOKEN_SUBSCRIPT_OPEN      => 1, # [
-    $TOKEN_SUBSCRIPT_CLOSE     => 1, # ]
-    $TOKEN_UNION               => 1, # ,
-    $TOKEN_ARRAY_SLICE         => 1, # [ start:end:step ]
-    $TOKEN_SINGLE_EQUAL        => 1, # =
-    $TOKEN_DOUBLE_EQUAL        => 1, # ==
-    $TOKEN_TRIPLE_EQUAL        => 1, # ===
-    $TOKEN_GREATER_THAN        => 1, # >
-    $TOKEN_LESS_THAN           => 1, # <
-    $TOKEN_NOT_EQUAL           => 1, # !=
-    $TOKEN_GREATER_EQUAL       => 1, # >=
-    $TOKEN_LESS_EQUAL          => 1, # <=
+    $TOKEN_ROOT                => 1,    # $
+    $TOKEN_CURRENT             => 1,    # @
+    $TOKEN_CHILD               => 1,    # . OR []
+    $TOKEN_RECURSIVE           => 1,    # ..
+    $TOKEN_ALL                 => 1,    # *
+    $TOKEN_FILTER_OPEN         => 1,    # ?(
+    $TOKEN_SCRIPT_OPEN         => 1,    # (
+    $TOKEN_FILTER_SCRIPT_CLOSE => 1,    # )
+    $TOKEN_SUBSCRIPT_OPEN      => 1,    # [
+    $TOKEN_SUBSCRIPT_CLOSE     => 1,    # ]
+    $TOKEN_UNION               => 1,    # ,
+    $TOKEN_ARRAY_SLICE         => 1,    # [ start:end:step ]
+    $TOKEN_SINGLE_EQUAL        => 1,    # =
+    $TOKEN_DOUBLE_EQUAL        => 1,    # ==
+    $TOKEN_TRIPLE_EQUAL        => 1,    # ===
+    $TOKEN_GREATER_THAN        => 1,    # >
+    $TOKEN_LESS_THAN           => 1,    # <
+    $TOKEN_NOT_EQUAL           => 1,    # !=
+    $TOKEN_GREATER_EQUAL       => 1,    # >=
+    $TOKEN_LESS_EQUAL          => 1,    # <=
 );
 
 # EXPRESSION                                    TOKENS
@@ -102,7 +104,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
         if ( !ref $obj ) {
             return $want_ref ? \$obj : $obj;
         }
-        else {   # Not sure about the dclone here... 
+        else {
             return $want_ref ? $obj : dclone($obj);
         }
     }
@@ -129,27 +131,35 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                 }
             }
 
+            my $operator;
             # FIXME: what about [?(@.foo)] ? that's a valid filter
+            # Treat as @.foo IS TRUE
             my $rhs = pop @sub_stream;
-            $rhs = normalize($rhs);
-
-            my $operator = pop @sub_stream;
+            if ($rhs !~ /^["']/) { # assume this is a boolean expression
+                push @sub_stream, $rhs;
+                $operator = $OPERATOR_IS_TRUE;
+            }
+            else { 
+                $rhs = normalize($rhs);
+                $operator = pop @sub_stream;
+            }
 
             # Evaluate the left hand side of the comparison first. NOTE: We DO NOT want to set $want_ref here.
             my @lhs = $self->_evaluate( $obj, [@sub_stream] );
 
             # FIXME: What if $obj is not an array?
-            
+
             # get indexes that pass compare()
-            my @matching = grep { compare( $operator, $lhs[$_], $rhs ) } ( 0 .. $#lhs );    
-            
+            my @matching = grep { compare( $operator, $lhs[$_], $rhs ) } ( 0 .. $#lhs );
+
             # Evaluate the token stream on all elements that pass the comparison in compare()
             my @ret = map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } @matching;
             return @ret;
         }
         elsif ( $token eq $TOKEN_RECURSIVE ) {
             my $index = get_token($token_stream);
-            my @ret = map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } _match_recursive( $obj, $index, $want_ref );
+            my @ret = map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) }
+                _match_recursive( $obj, $index, $want_ref );
             return @ret;
         }
         else {
@@ -170,9 +180,10 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             else {
                 assert( _hashlike($obj) ) if $ASSERT_ENABLE;
                 if ( $index ne $TOKEN_ALL ) {
-                    # If we have found a scalar at the end of the path but we want a ref, pass a reference to 
+
+                    # If we have found a scalar at the end of the path but we want a ref, pass a reference to
                     # that scalar.
-                    my $to_evaluate = ($want_ref && ! ref $obj->{$index}) ? \($obj->{$index}) : $obj->{$index};
+                    my $to_evaluate = ( $want_ref && !ref $obj->{$index} ) ? \( $obj->{$index} ) : $obj->{$index};
 
                     return $self->_evaluate( $to_evaluate, $token_stream, $want_ref );
                 }
@@ -203,12 +214,12 @@ sub _match_recursive {
     my @match;
     if ( _arraylike($obj) ) {
         for ( 0 .. $#{$obj} ) {
-            push @match, $want_ref ? \($obj->[$_]) : $obj->[$_] if $_ eq $index;
+            push @match, $want_ref ? \( $obj->[$_] ) : $obj->[$_] if $_ eq $index;
             push @match, _match_recursive( $obj->[$_], $index, $want_ref );
         }
     }
     elsif ( _hashlike($obj) ) {
-        push @match, $want_ref ? \($obj->{$index}) : $obj->{$index} if exists $obj->{$index};
+        push @match, $want_ref ? \( $obj->{$index} ) : $obj->{$index} if exists $obj->{$index};
         push @match, _match_recursive( $_, $index, $want_ref ) for values %{$obj};
     }
     return @match;
@@ -227,6 +238,10 @@ sub normalize {
 
 sub compare {
     my ( $operator, $lhs, $rhs ) = @_;
+
+    if ($operator eq $OPERATOR_IS_TRUE) { 
+        return $lhs ? 1 : 0;
+    }
 
     my $use_numeric = looks_like_number($lhs) && looks_like_number($rhs);
 
