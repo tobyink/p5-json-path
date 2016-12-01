@@ -32,7 +32,7 @@ tie my %data, 'Tie::IxHash', (
                 quuy => 'omicron',
             },
             weight => 20,
-            quux => 1,
+            quux   => 1,
         },
         {   type => {
                 code => 'CODE_BETA',
@@ -44,7 +44,7 @@ tie my %data, 'Tie::IxHash', (
                 quuy => 'nu',
             },
             weight => 10,
-            quux => 0,
+            quux   => 0,
         },
         {   type => {
                 code => 'CODE_GAMMA',
@@ -59,45 +59,48 @@ tie my %data, 'Tie::IxHash', (
 
         }
     ],
+    multilevel_array => [
+        [ [qw/alpha beta gamma/], [qw/delta epsilon zeta/], ],
+        [ [qw/eta theta iota/],   [qw/kappa lambda mu/], ],
+    ],
     subkey1 => 'DO NOT WANT',
 );
 
-my %EXPRESSIONS = (
-    '$.simple'                   => [ $data{simple} ],
-    '$.long_hash.key1'           => [ dclone $data{long_hash}{key1} ],
-    '$.long_hash.key1.subkey2'   => [ $data{long_hash}{key1}{subkey2} ],
-    q{$.complex_array[0]['foo']} => [ $data{complex_array}[0]{foo} ],
-    '$.*'                        => [ map { ref $_ ? dclone $_ : $_ } values %data ],
-    '$.complex_array[?(@.quux)]' => [ grep { $_->{quux} } @{$data{complex_array}} ],
+# ok 1 - "$..foo" evaluated correctly
+# ok 2 - "$.complex_array[?(@.quux)]" evaluated correctly
+# ok 3 - "$.long_hash.key1" evaluated correctly
+# ok 4 - "$.multilevel_array[0][1][0][0][0]" evaluated correctly
+# ok 5 - "$.complex_array[0]['foo']" evaluated correctly
+my @EXPRESSIONS = (
     '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>
         [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data{complex_array} } )[0] ) ],
     '$.complex_array[?(@.weight > 10)]' => [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
-    '$..foo' => [qw/bar baz bak/],
     '$.complex_array[?(@.weight > 10)].classification.quux' =>
         [ map { $_->{classification}{quux} } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
-    '$..key2.subkey1' => ['2value1'],
     '$..complex_array[?(@.weight > 10)].classification.quux' =>
         [ map { $_->{classification}{quux} } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
-        #    '$..classi
 
-#    '$.[*].id'                                      => [qw/$ . [ * ] . id/],
-#    q{$.[0].title}                                  => [qw/$ . [ 0 ] . title/],
-#    q{$..labels[?(@.name==bug)]}                    => [qw/$ .. labels [?( @ . name == bug )]/],
-#    q{$.store.book[(@.length-1)].title}             => [qw/$ . store . book [( @ . length-1 )] . title/],
-#    q{$.store.book[?(@.price < 10)].title}          => [ qw/$ . store . book [?( @ . /, 'price ', '<', ' 10', qw/)] . title/ ],
-#    q{$.store.book[?(@.price <= 10)].title}          => [ qw/$ . store . book [?( @ . /, 'price ', '<=', ' 10', qw/)] . title/ ],
-#    q{$.store.book[?(@.price >= 10)].title}          => [ qw/$ . store . book [?( @ . /, 'price ', '>=', ' 10', qw/)] . title/ ],
-#    q{$.store.book[?(@.price === 10)].title}          => [ qw/$ . store . book [?( @ . /, 'price ', '===', ' 10', qw/)] . title/ ],
-#    q{$['store']['book'][0]['author']}              => [ '$', '[', q('store'), ']', '[', q('book'), ']', '[', 0, ']', '[', q('author'), ']' ],
-#    q{$.[*].user[?(@.login == 'laurilehmijoki')]}   => [ qw/$ . [ * ] . user [?( @ ./,  'login ', '==',  q{ 'laurilehmijoki'}, ')]' ],
+    '$.*' => [ map { ref $_ ? dclone $_ : $_ } values %data ],
+    '$.simple'                    => [ $data{simple} ],
+    '$.long_hash.key1.subkey2'    => [ $data{long_hash}{key1}{subkey2} ],
+    '$.complex_array[?(@.quux)]'  => [ grep { $_->{quux} } @{ $data{complex_array} } ],
+    '$..key2.subkey1'             => ['2value1'],
+    '$.long_hash.key1'            => [ dclone $data{long_hash}{key1} ],
+    q{$.complex_array[0]['foo']}  => [ $data{complex_array}[0]{foo} ],
+    '$..foo'                      => [qw/bar baz bak/],
+    '$.multilevel_array.1.0.0'    => [ $data{multilevel_array}->[1][0][0] ],
+    '$.multilevel_array.0.1[0]'   => [ $data{multilevel_array}->[0][1][0] ],
+    '$.multilevel_array[0][0][1]' => [ $data{multilevel_array}->[0][0][1] ],
+    '$.nonexistent'               => [],
+    '$..nonexistent'              => [],
 );
 
-for my $expression ( keys %EXPRESSIONS ) {
-    is_deeply(
-        [ JSON::Path::Compiler::evaluate( dclone \%data, $expression ) ],
-        $EXPRESSIONS{$expression},
-        qq{"$expression" evaluated correctly}
-    );
+while ( my $expression = shift @EXPRESSIONS ) {
+    my $expected = shift @EXPRESSIONS;
+    lives_and {
+        is_deeply( [ JSON::Path::Compiler::evaluate( dclone \%data, $expression ) ], $expected, )
+    }
+    qq{"$expression" evaluated correctly};
 }
 
 done_testing;

@@ -12,7 +12,7 @@ use Sys::Hostname qw/hostname/;
 our $AUTHORITY = 'cpan:POPEFELIX';
 our $VERSION   = '1.00';
 
-my $OPERATOR_IS_TRUE = 'IS_TRUE';
+Readonly my $OPERATOR_IS_TRUE => 'IS_TRUE';
 
 my $ASSERT_ENABLE =
     defined $ENV{ASSERT_ENABLE} ? $ENV{ASSERT_ENABLE} : hostname =~ /^lls.+?[.]cb[.]careerbuilder[.]com/;
@@ -40,28 +40,31 @@ sub _new {
 #
 # With JSONPath square brackets operate on the object or array addressed by the previous path fragment. Indices always start by 0.
 
-my %OPERATORS => (
-    $TOKEN_ROOT                => 1,    # $
-    $TOKEN_CURRENT             => 1,    # @
-    $TOKEN_CHILD               => 1,    # . OR []
-    $TOKEN_RECURSIVE           => 1,    # ..
-    $TOKEN_ALL                 => 1,    # *
-    $TOKEN_FILTER_OPEN         => 1,    # ?(
-    $TOKEN_SCRIPT_OPEN         => 1,    # (
-    $TOKEN_FILTER_SCRIPT_CLOSE => 1,    # )
-    $TOKEN_SUBSCRIPT_OPEN      => 1,    # [
-    $TOKEN_SUBSCRIPT_CLOSE     => 1,    # ]
-    $TOKEN_UNION               => 1,    # ,
-    $TOKEN_ARRAY_SLICE         => 1,    # [ start:end:step ]
-    $TOKEN_SINGLE_EQUAL        => 1,    # =
-    $TOKEN_DOUBLE_EQUAL        => 1,    # ==
-    $TOKEN_TRIPLE_EQUAL        => 1,    # ===
-    $TOKEN_GREATER_THAN        => 1,    # >
-    $TOKEN_LESS_THAN           => 1,    # <
-    $TOKEN_NOT_EQUAL           => 1,    # !=
-    $TOKEN_GREATER_EQUAL       => 1,    # >=
-    $TOKEN_LESS_EQUAL          => 1,    # <=
+my $OPERATOR_TYPE_PATH       = 1;
+my $OPERATOR_TYPE_COMPARISON = 2;
+Readonly my %OPERATORS => (
+    $TOKEN_ROOT                => $OPERATOR_TYPE_PATH,          # $
+    $TOKEN_CURRENT             => $OPERATOR_TYPE_PATH,          # @
+    $TOKEN_CHILD               => $OPERATOR_TYPE_PATH,          # . OR []
+    $TOKEN_RECURSIVE           => $OPERATOR_TYPE_PATH,          # ..
+    $TOKEN_ALL                 => $OPERATOR_TYPE_PATH,          # *
+    $TOKEN_FILTER_OPEN         => $OPERATOR_TYPE_PATH,          # ?(
+    $TOKEN_SCRIPT_OPEN         => $OPERATOR_TYPE_PATH,          # (
+    $TOKEN_FILTER_SCRIPT_CLOSE => $OPERATOR_TYPE_PATH,          # )
+    $TOKEN_SUBSCRIPT_OPEN      => $OPERATOR_TYPE_PATH,          # [
+    $TOKEN_SUBSCRIPT_CLOSE     => $OPERATOR_TYPE_PATH,          # ]
+    $TOKEN_UNION               => $OPERATOR_TYPE_PATH,          # ,
+    $TOKEN_ARRAY_SLICE         => $OPERATOR_TYPE_PATH,          # [ start:end:step ]
+    $TOKEN_SINGLE_EQUAL        => $OPERATOR_TYPE_COMPARISON,    # =
+    $TOKEN_DOUBLE_EQUAL        => $OPERATOR_TYPE_COMPARISON,    # ==
+    $TOKEN_TRIPLE_EQUAL        => $OPERATOR_TYPE_COMPARISON,    # ===
+    $TOKEN_GREATER_THAN        => $OPERATOR_TYPE_COMPARISON,    # >
+    $TOKEN_LESS_THAN           => $OPERATOR_TYPE_COMPARISON,    # <
+    $TOKEN_NOT_EQUAL           => $OPERATOR_TYPE_COMPARISON,    # !=
+    $TOKEN_GREATER_EQUAL       => $OPERATOR_TYPE_COMPARISON,    # >=
+    $TOKEN_LESS_EQUAL          => $OPERATOR_TYPE_COMPARISON,    # <=
 );
+
 
 # EXPRESSION                                    TOKENS
 # $.[*].id                                      $ . [ * ] . id
@@ -131,17 +134,18 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                 }
             }
 
-            my $operator;
             # FIXME: what about [?(@.foo)] ? that's a valid filter
             # Treat as @.foo IS TRUE
             my $rhs = pop @sub_stream;
-            if ($rhs !~ /^["']/) { # assume this is a boolean expression
-                push @sub_stream, $rhs;
-                $operator = $OPERATOR_IS_TRUE;
+            my $operator = pop @sub_stream;
+
+            # This assumes that RHS is only a single token. I think that's a safe assumption.
+            if ($OPERATORS{$operator} eq $OPERATOR_TYPE_COMPARISON) { 
+                $rhs = normalize($rhs);
             }
             else { 
-                $rhs = normalize($rhs);
-                $operator = pop @sub_stream;
+                push @sub_stream, $operator, $rhs;
+                $operator = $OPERATOR_IS_TRUE;
             }
 
             # Evaluate the left hand side of the comparison first. NOTE: We DO NOT want to set $want_ref here.
@@ -163,15 +167,19 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             return @ret;
         }
         else {
-            assert( !$OPERATORS{$token}, qq{"$token" is not an operator} );
+            my $index = normalize($token);
+            
+            assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
 
-            my $index = $token;
-
-            $index = normalize($index);
             if ( _arraylike($obj) ) {
                 if ( $index ne $TOKEN_ALL ) {
                     return unless looks_like_number($index);
-                    return $self->_evaluate( $obj->[$index], $token_stream );
+                    
+                    # If we have found a scalar at the end of the path but we want a ref, pass a reference to
+                    # that scalar.
+                    my $evaluand = ( $want_ref && !ref $obj->[$index] ) ? \( $obj->[$index] ) : $obj->[$index];
+                    
+                    return $self->_evaluate( $evaluand, $token_stream, $want_ref );
                 }
                 else {
                     return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } ( 0 .. $#{$obj} );
@@ -180,12 +188,13 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             else {
                 assert( _hashlike($obj) ) if $ASSERT_ENABLE;
                 if ( $index ne $TOKEN_ALL ) {
+                    return unless exists $obj->{$index};
 
                     # If we have found a scalar at the end of the path but we want a ref, pass a reference to
                     # that scalar.
-                    my $to_evaluate = ( $want_ref && !ref $obj->{$index} ) ? \( $obj->{$index} ) : $obj->{$index};
+                    my $evaluand = ( $want_ref && !ref $obj->{$index} ) ? \( $obj->{$index} ) : $obj->{$index};
 
-                    return $self->_evaluate( $to_evaluate, $token_stream, $want_ref );
+                    return $self->_evaluate( $evaluand, $token_stream, $want_ref );
                 }
                 else {
                     return map { $self->_evaluate( $_, dclone($token_stream) ) } values %{$obj};
@@ -193,12 +202,13 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             }
         }
     }
+    1;
 }
 
 sub get_token {
     my $token_stream = shift;
     my $token        = shift @{$token_stream};
-    return unless $token;
+    return unless defined $token;
 
     if ( $token eq $TOKEN_SUBSCRIPT_OPEN ) {
         my $next_token = shift @{$token_stream};

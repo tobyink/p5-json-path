@@ -32,7 +32,7 @@ tie my %data, 'Tie::IxHash', (
                 quuy => 'omicron',
             },
             weight => 20,
-            quux => 1,
+            quux   => 1,
         },
         {   type => {
                 code => 'CODE_BETA',
@@ -44,7 +44,7 @@ tie my %data, 'Tie::IxHash', (
                 quuy => 'nu',
             },
             weight => 10,
-            quux => 0,
+            quux   => 0,
 
         },
         {   type => {
@@ -59,6 +59,10 @@ tie my %data, 'Tie::IxHash', (
             weight => 30,
 
         }
+    ],
+    multilevel_array => [
+        [ [qw/alpha beta gamma/], [qw/delta epsilon zeta/], ],
+        [ [qw/eta theta iota/],   [qw/kappa lambda mu/], ],
     ],
     subkey1 => 'DO NOT WANT',
 );
@@ -98,13 +102,13 @@ my %EXPRESSIONS = (
         my ($code_alpha) = grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $obj->{complex_array} };
         is $ref->{$key}, $code_alpha->{$key}, q{Value OK};
     },
-    '$.complex_array[?(@.quux)]' => sub { 
+    '$.complex_array[?(@.quux)]' => sub {
         my ( $refs, $obj ) = @_;
-        my @expected_refs = grep { $_->{quux} } @{$obj->{complex_array}};
-        for (0 .. $#{$refs}) { 
-            my $ref      = $refs->[$_];
+        my @expected_refs = grep { $_->{quux} } @{ $obj->{complex_array} };
+        for ( 0 .. $#{$refs} ) {
+            my $ref = $refs->[$_];
             is ref $ref, 'HASH', qq{Reftype $_ OK};
-            
+
             my $key = sprintf 'abc%d', int rand 1000;
             $ref->{$key} = 'foo';
             is $expected_refs[$_]->{$key}, 'foo', q{Value OK};
@@ -120,10 +124,22 @@ my %EXPRESSIONS = (
             is $obj->{complex_array}[$_]{foo}, $expected, qq{Value $_ OK};
         }
     },
+    '$.nonexistent' => sub {
+        my ( $refs, $obj ) = @_;
+        is scalar @{$refs}, 0, 'Nonexistent path gives nothing back';
+    },
     '$..nonexistent' => sub {
         my ( $refs, $obj ) = @_;
         is scalar @{$refs}, 0, 'Nonexistent path gives nothing back';
     },
+    '$.multilevel_array.1.0.0'    => sub { 
+        my ($refs, $obj) = @_;
+        my ($ref) = @{$refs};
+        my $expected = int rand 1000;
+        is ref $ref, 'SCALAR', q{Reftype OK};
+        ${$ref} = $expected;
+        is $obj->{multilevel_array}[1][0][0], $expected, q{Value OK};
+    }
 );
 
 for my $expression ( keys %EXPRESSIONS ) {
