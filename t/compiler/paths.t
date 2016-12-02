@@ -36,6 +36,7 @@ my @EXPRESSIONS = (
     '$.array[0,1]'                => [ @{ $data{array} }[ ( 0, 1 ) ] ],
     '$.array[1:3]' => [ @{ $data{array} }[ ( 1 .. 3 ) ] ],
     '$.array[-1:]' => [ $data{array}->[-1] ],
+    '$.store.book[*].title' => [ map { $_->{title} } @{ $data{store}{book} } ],
 );
 
 # my ($results2) = JSON::Path::Compiler->evaluate('$..book[-1:]', $object);
