@@ -1,4 +1,6 @@
-use 5.016;
+use strict;
+use warnings;
+use 5.008;
 
 package JSON::Path::Constants;
 use Readonly;

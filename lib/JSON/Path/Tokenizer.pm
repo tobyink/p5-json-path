@@ -1,6 +1,9 @@
 package JSON::Path::Tokenizer;
 
-use 5.016;
+use strict;
+use warnings;
+use 5.008;
+
 use Carp;
 use Readonly;
 use JSON::Path::Constants qw(:symbols);

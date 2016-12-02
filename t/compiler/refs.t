@@ -1,5 +1,3 @@
-use 5.016;
-
 use Test::Most;
 use JSON::Path::Compiler;
 use Storable qw(dclone);

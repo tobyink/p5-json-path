@@ -1,14 +1,19 @@
 package JSON::Path::Compiler;
 
-use 5.016;
+use strict;
+use warnings;
+use 5.008;
+
 use Carp;
 use Carp::Assert qw(assert);
+use JSON::MaybeXS;
 use JSON::Path::Constants qw(:operators);
 use JSON::Path::Tokenizer qw(tokenize);
 use Readonly;
 use Scalar::Util qw/looks_like_number blessed/;
 use Storable qw/dclone/;
 use Sys::Hostname qw/hostname/;
+use Try::Tiny;
 our $AUTHORITY = 'cpan:POPEFELIX';
 our $VERSION   = '1.00';
 
@@ -94,6 +99,15 @@ sub _arraylike {
 sub evaluate {
     my ( $json_object, $expression, $want_ref ) = @_;
 
+    if (!ref $json_object) { 
+        try { 
+            $json_object = decode_json($json_object);
+        }
+        catch { 
+            croak qq{Unable to decode $json_object as JSON: $_};
+        }
+    }
+
     my $self = __PACKAGE__->_new( root => $json_object );
     return $self->_evaluate( $json_object, [ tokenize($expression) ], $want_ref );
 }
@@ -124,7 +138,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             my @sub_stream;
 
             # Build a stream of just the tokens between the filter open and close
-            while ( defined( my $token = shift @{$token_stream} ) ) {
+            while ( defined( my $token = get_token($token_stream) ) ) {
                 last if $token eq $TOKEN_FILTER_SCRIPT_CLOSE;
                 if ( $token eq $TOKEN_CURRENT ) {
                     push @sub_stream, $token, $TOKEN_CHILD, $TOKEN_ALL;
@@ -134,7 +148,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                 }
             }
 
-            # FIXME: what about [?(@.foo)] ? that's a valid filter
+            
             # Treat as @.foo IS TRUE
             my $rhs = pop @sub_stream;
             my $operator = pop @sub_stream;
@@ -172,7 +186,14 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
 
             if ( _arraylike($obj) ) {
-                if ( $index ne $TOKEN_ALL ) {
+                if ( ref $index ) { 
+                    assert( ref $index eq 'ARRAY', q{Index is an arrayref} ) if $ASSERT_ENABLE;
+                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } _slice($obj, $index);
+                }
+                elsif ( $index eq $TOKEN_ALL ) {
+                    return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } ( 0 .. $#{$obj} );
+                }
+                else {
                     return unless looks_like_number($index);
                     
                     # If we have found a scalar at the end of the path but we want a ref, pass a reference to
@@ -181,13 +202,15 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                     
                     return $self->_evaluate( $evaluand, $token_stream, $want_ref );
                 }
-                else {
-                    return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } ( 0 .. $#{$obj} );
-                }
             }
             else {
                 assert( _hashlike($obj) ) if $ASSERT_ENABLE;
-                if ( $index ne $TOKEN_ALL ) {
+                croak q{Slices are not supported on hash-like objects} if ref $index;
+
+                if ( $index eq $TOKEN_ALL ) {
+                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } values %{$obj};
+                }
+                else {
                     return unless exists $obj->{$index};
 
                     # If we have found a scalar at the end of the path but we want a ref, pass a reference to
@@ -195,9 +218,6 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                     my $evaluand = ( $want_ref && !ref $obj->{$index} ) ? \( $obj->{$index} ) : $obj->{$index};
 
                     return $self->_evaluate( $evaluand, $token_stream, $want_ref );
-                }
-                else {
-                    return map { $self->_evaluate( $_, dclone($token_stream) ) } values %{$obj};
                 }
             }
         }
@@ -211,12 +231,62 @@ sub get_token {
     return unless defined $token;
 
     if ( $token eq $TOKEN_SUBSCRIPT_OPEN ) {
-        my $next_token = shift @{$token_stream};
-        my $close      = shift @{$token_stream};
-        assert( $close eq $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
-        return $next_token;
+        my @substream;
+        my $close_seen;
+        while (defined( my $token = shift @{$token_stream})) {
+            if ($token eq $TOKEN_SUBSCRIPT_CLOSE) {
+                $close_seen = 1;
+                last;
+            }
+            push @substream, $token;
+        }
+
+        assert( $close_seen ) if $ASSERT_ENABLE;
+
+        if ( grep { $_ eq $TOKEN_ARRAY_SLICE } @substream ) {
+            # There are five valid cases:
+            #
+            # n:m   -> n:m:1
+            # n:m:s -> n:m:s
+            # :m    -> 0:m:1
+            # ::s   -> 0:-1:s
+            # n:    -> n:-1:1
+            if ( $substream[0] eq $TOKEN_ARRAY_SLICE ) {
+                unshift @substream, undef;
+            }
+
+            no warnings qw/uninitialized/;
+            if ( $substream[2] eq $TOKEN_ARRAY_SLICE ) {
+                @substream = ( @substream[ ( 0, 1 ) ], undef, @substream[ ( 2 .. $#substream ) ] );
+            }
+            use warnings qw/uninitialized/;
+
+            my ( $start, $end, $step );
+            $start = $substream[0] // 0;
+            $end   = $substream[2] // -1;
+            $step  = $substream[4] // 1;
+            return [ $start, $end, $step ];
+        }
+
+        return $substream[0];
     }
     return $token;
+}
+
+sub _slice {
+    my ( $array, $spec ) = @_;
+    my ( $start, $end, $step ) = @{$spec};
+    $start = $#{$array} if $start == -1;
+    $end = $#{$array} if $end == -1;
+    my @indices;
+    if ($step < 0) { 
+        @indices = grep { %_ % -$step == 0 } reverse ( $start .. $end );
+    } 
+    else { 
+        @indices = grep { $_ % $step == 0 } ( $start .. $end );
+    }
+
+    return @{$array}[@indices];
 }
 
 sub _match_recursive {
