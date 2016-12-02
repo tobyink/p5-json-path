@@ -7,7 +7,7 @@ my @EXPRESSIONS = (
     '$.array[-1:]' => single_ref( sub { $_[0]->{array}[-1] } ),
     '$.array[0,1]' => sub {
         my ( $refs, $obj ) = @_;
-        for (0 .. $#{$refs} ) {
+        for ( 0 .. $#{$refs} ) {
             my $ref      = $refs->[$_];
             my $expected = int rand 1000;
             is ref $ref, 'SCALAR', qq{Reftype $_ OK};
@@ -17,12 +17,12 @@ my @EXPRESSIONS = (
     },
     '$.array[1:3]' => sub {
         my ( $refs, $obj ) = @_;
-        for (0 .. $#{$refs} ) {
+        for ( 0 .. $#{$refs} ) {
             my $ref      = $refs->[$_];
             my $expected = int rand 1000;
             is ref $ref, 'SCALAR', qq{Reftype $_ OK};
             ${$ref} = $expected;
-            is $obj->{array}[$_ + 1], $expected, qq{Value $_ OK};
+            is $obj->{array}[ $_ + 1 ], $expected, qq{Value $_ OK};
         }
     },
     '$..book[-1:]'                                  => single_ref( sub { $_[0]->{store}{book}[-1] } ),
@@ -80,6 +80,21 @@ my @EXPRESSIONS = (
             is ref $ref, 'SCALAR', qq{Reftype $_ OK};
             ${$ref} = $expected;
             is $obj->{store}{book}[$_]{title}, $expected, qq{Value $_ OK};
+        }
+    },
+    '$.long_hash.key1[subkey1,subkey2]' => sub {
+        my ( $refs, $obj ) = @_;
+        for ( 0 .. $#{$refs} ) {
+            my $ref      = $refs->[$_];
+            my $expected = int rand 1000;
+            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
+            ${$ref} = $expected;
+            if ( $_ == 0 ) {
+                is $obj->{long_hash}{key1}{subkey1}, $expected, q{Value for 'subkey1' OK};
+            }
+            else {
+                is $obj->{long_hash}{key1}{subkey2}, $expected, q{Value for 'subkey2' OK};
+            }
         }
     },
 );

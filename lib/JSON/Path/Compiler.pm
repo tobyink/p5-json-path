@@ -217,7 +217,8 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
                 if ( ref $index && $index->{union} ) {
                     my @union = @{ $index->{union} };
-                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$obj}{@union};
+                    my @evaluands = map { ( $want_ref && !ref $obj->{$_} ) ? \( $obj->{$_} ) : $obj->{$_} } @union;
+                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @evaluands;
                 }
                 elsif ( $index eq $TOKEN_ALL ) {
                     return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } values %{$obj};
@@ -299,19 +300,19 @@ sub _slice {
     my ( $start, $end, $step ) = @{$spec};
 
     # start, end, and step are set in get_token
-    assert(defined $start) if $ASSERT_ENABLE;
-    assert(defined $end) if $ASSERT_ENABLE;
-    assert(defined $step) if $ASSERT_ENABLE;
+    assert( defined $start ) if $ASSERT_ENABLE;
+    assert( defined $end )   if $ASSERT_ENABLE;
+    assert( defined $step )  if $ASSERT_ENABLE;
 
-    $start = ($length - 1) if $start == -1;
-    $end   = $length if $end == -1;
+    $start = ( $length - 1 ) if $start == -1;
+    $end   = $length         if $end == -1;
 
     my @indices;
     if ( $step < 0 ) {
-        @indices = grep { %_ % -$step == 0 } reverse( $start .. ($end - 1) );
+        @indices = grep { %_ % -$step == 0 } reverse( $start .. ( $end - 1 ) );
     }
     else {
-        @indices = grep { $_ % $step == 0 } ( $start .. ($end - 1) );
+        @indices = grep { $_ % $step == 0 } ( $start .. ( $end - 1 ) );
     }
     return @indices;
 }

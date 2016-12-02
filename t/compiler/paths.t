@@ -34,9 +34,10 @@ my @EXPRESSIONS = (
     '$..book[-1:]'                => [ $data{store}{book}->[-1] ],
     '$.array[0]'                  => [ $data{array}->[0] ],
     '$.array[0,1]'                => [ @{ $data{array} }[ ( 0, 1 ) ] ],
-    '$.array[1:3]' => [ @{ $data{array} }[ ( 1 .. 3 ) ] ],
+    '$.array[1:3]' => [ @{ $data{array} }[ ( 1 .. 2 ) ] ],
     '$.array[-1:]' => [ $data{array}->[-1] ],
     '$.store.book[*].title' => [ map { $_->{title} } @{ $data{store}{book} } ],
+    '$.long_hash.key1[subkey1,subkey2]' => [ @{$data{long_hash}{key1}}{qw/subkey1 subkey2/} ],
 );
 
 # my ($results2) = JSON::Path::Compiler->evaluate('$..book[-1:]', $object);
