@@ -1,4 +1,4 @@
-package JSON::Path::Compiler;
+package JSON::Path::Evaluator;
 
 use strict;
 use warnings;
@@ -17,37 +17,10 @@ use Try::Tiny;
 our $AUTHORITY = 'cpan:POPEFELIX';
 our $VERSION   = '1.00';
 
-Readonly my $OPERATOR_IS_TRUE => 'IS_TRUE';
-
-my $ASSERT_ENABLE =
-    defined $ENV{ASSERT_ENABLE} ? $ENV{ASSERT_ENABLE} : hostname =~ /^lls.+?[.]cb[.]careerbuilder[.]com/;
-
-sub _new {
-    my $class = shift;
-    my %args  = ref $_[0] eq 'HASH' ? %{ $_[0] } : @_;
-    my $self  = {};
-    $self->{root} = $args{root};
-    bless $self, $class;
-    return $self;
-}
-
-# JSONPath              Function
-# $                     the root object/element
-# @                     the current object/element
-# . or []               child operator
-# ..                    recursive descent. JSONPath borrows this syntax from E4X.
-# *                     wildcard. All objects/elements regardless their names.
-# []                    subscript operator. XPath uses it to iterate over element collections and for predicates. In Javascript and JSON it is the native array operator.
-# [,]                   Union operator in XPath results in a combination of node sets. JSONPath allows alternate names or array indices as a set.
-# [start:end:step]      array slice operator borrowed from ES4.
-# ?()                   applies a filter (script) expression.
-# ()                    script expression, using the underlying script engine.
-#
-# With JSONPath square brackets operate on the object or array addressed by the previous path fragment. Indices always start by 0.
-
-my $OPERATOR_TYPE_PATH       = 1;
-my $OPERATOR_TYPE_COMPARISON = 2;
-Readonly my %OPERATORS => (
+Readonly my $OPERATOR_IS_TRUE         => 'IS_TRUE';
+Readonly my $OPERATOR_TYPE_PATH       => 1;
+Readonly my $OPERATOR_TYPE_COMPARISON => 2;
+Readonly my %OPERATORS                => (
     $TOKEN_ROOT                => $OPERATOR_TYPE_PATH,          # $
     $TOKEN_CURRENT             => $OPERATOR_TYPE_PATH,          # @
     $TOKEN_CHILD               => $OPERATOR_TYPE_PATH,          # . OR []
@@ -70,34 +43,43 @@ Readonly my %OPERATORS => (
     $TOKEN_LESS_EQUAL          => $OPERATOR_TYPE_COMPARISON,    # <=
 );
 
-# EXPRESSION                                    TOKENS
-# $.[*].id                                      $ . [ * ] . id
-# $.[0].title                                   $ . [ 0 ] . title
-# $.[*].user[?(@.login == 'laurilehmijoki')]    $ . [ * ] . user [ ? ( @ . login =='laurilehmijoki' ) ]
-# $..labels[?(@.name==bug)]                     $ .. labels [ ? ( @ . name ==bug ) ]
-# $.addresses[?(@.addresstype.id == D84002)]    $ . addresses [ ? ( @ . addresstype . id ==D84002 ) ]
-# $.store.book[(@.length-1)].title              $ . store . book [ ( @ . length -1 ) ] . title
-# $.store.book[?(@.price < 10)].title           $ . store . book [ ? ( @ . price <10 ) ] . title
-#
-# $['store']['book'][0]['author']
-# $['store']['book'][1]['author']
-# $['store']['book'][2]['author']
-# $['store']['book'][3]['author']
-#
+Readonly my $ASSERT_ENABLE => $ENV{ASSERT_ENABLE};
 
-sub _hashlike {
-    my $object = shift;
-    return ( ref $object eq 'HASH' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'HASH' ) );
+sub new {
+    my $class = shift;
+    my %args  = ref $_[0] eq 'HASH' ? %{ $_[0] } : @_;
+    my $self  = {};
+    for my $key (qw/root expression/) {
+        croak qq{Missing required argument '$key' in constructor} unless $args{$key};
+        $self->{$key} = $args{$key};
+    }
+    $self->{want_ref} = $args{want_ref} || 0;
+    bless $self, $class;
+    return $self;
 }
 
-sub _arraylike {
-    my $object = shift;
-    return ( ref $object eq 'ARRAY' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'ARRAY' ) );
+# JSONPath              Function
+# $                     the root object/element
+# @                     the current object/element
+# . or []               child operator
+# ..                    recursive descent. JSONPath borrows this syntax from E4X.
+# *                     wildcard. All objects/elements regardless their names.
+# []                    subscript operator. XPath uses it to iterate over element collections and for predicates. In Javascript and JSON it is the native array operator.
+# [,]                   Union operator in XPath results in a combination of node sets. JSONPath allows alternate names or array indices as a set.
+# [start:end:step]      array slice operator borrowed from ES4.
+# ?()                   applies a filter (script) expression.
+# ()                    script expression, using the underlying script engine.
+#
+# With JSONPath square brackets operate on the object or array addressed by the previous path fragment. Indices always start by 0.
+
+sub to_string {
+    return $_[0]->{expression};
 }
 
 sub evaluate {
-    my ( $json_object, $expression, $want_ref ) = @_;
+    my ( $json_object, $expression, %args ) = @_;
 
+    my $want_ref = $args{want_ref} || 0;
     if ( !ref $json_object ) {
         try {
             $json_object = decode_json($json_object);
@@ -107,7 +89,7 @@ sub evaluate {
         }
     }
 
-    my $self = __PACKAGE__->_new( root => $json_object );
+    my $self = __PACKAGE__->new( root => $json_object, expression => $expression );
     return $self->_evaluate( $json_object, [ tokenize($expression) ], $want_ref );
 }
 
@@ -237,6 +219,17 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
     }
     1;
 }
+
+sub _hashlike {
+    my $object = shift;
+    return ( ref $object eq 'HASH' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'HASH' ) );
+}
+
+sub _arraylike {
+    my $object = shift;
+    return ( ref $object eq 'ARRAY' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'ARRAY' ) );
+}
+
 
 sub get_token {
     my $token_stream = shift;

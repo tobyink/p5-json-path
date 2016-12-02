@@ -1,6 +1,6 @@
 use Test::Most;
 use Carp;
-use JSON::Path::Compiler;
+use JSON::Path::Evaluator;
 use JSON::MaybeXS qw/decode_json/;
 
 my @EXPRESSIONS = (
@@ -106,7 +106,7 @@ while ( my $expression = shift @EXPRESSIONS ) {
 
     subtest $expression => sub {
         my @refs;
-        lives_ok { @refs = JSON::Path::Compiler::evaluate( $obj, $expression, 1 ) } q{evaluate() did not die};
+        lives_ok { @refs = JSON::Path::Evaluator::evaluate( $obj, $expression, 1 ) } q{evaluate() did not die};
         $test->( \@refs, $obj );
     };
 }

@@ -1,7 +1,7 @@
 use Test::Most;
 use Test::Deep;
 use JSON::MaybeXS qw/encode_json decode_json/;
-use JSON::Path::Compiler;
+use JSON::Path::Evaluator;
 use Storable qw(dclone);
 use Tie::IxHash;
 
@@ -40,7 +40,7 @@ my @EXPRESSIONS = (
     '$.long_hash.key1[subkey1,subkey2]' => [ @{$data{long_hash}{key1}}{qw/subkey1 subkey2/} ],
 );
 
-# my ($results2) = JSON::Path::Compiler->evaluate('$..book[-1:]', $object);
+# my ($results2) = JSON::Path::Evaluator->evaluate('$..book[-1:]', $object);
 #
 # is(ref $results2, 'HASH', "hashref value result");
 # is($results2->{isbn}, "0-395-19395-8", "hashref seems to be correct");
@@ -50,7 +50,7 @@ while ( my $expression = shift @EXPRESSIONS ) {
     subtest $expression => sub {
         my @got;
         lives_ok {
-            @got = JSON::Path::Compiler::evaluate( $json, $expression );
+            @got = JSON::Path::Evaluator::evaluate( $json, $expression );
         }
         q{evaluate() did not die};
 
