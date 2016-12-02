@@ -184,11 +184,15 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             my $index = normalize($token);
             
             assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
+            assert( ref $index eq 'HASH', q{Index is a hashref} ) if $ASSERT_ENABLE && ref $index;
 
             if ( _arraylike($obj) ) {
-                if ( ref $index ) { 
-                    assert( ref $index eq 'ARRAY', q{Index is an arrayref} ) if $ASSERT_ENABLE;
-                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } _slice($obj, $index);
+                if ( ref $index && $index->{slice} ) { 
+                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } _slice($obj, $index->{slice});
+                }
+                elsif ( ref $index && $index->{union} ) { 
+                    my @union = @{$index->{union}};
+                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$obj}[@union];
                 }
                 elsif ( $index eq $TOKEN_ALL ) {
                     return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } ( 0 .. $#{$obj} );
@@ -205,9 +209,13 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             }
             else {
                 assert( _hashlike($obj) ) if $ASSERT_ENABLE;
-                croak q{Slices are not supported on hash-like objects} if ref $index;
+                croak q{Slices are not supported on hash-like objects} if ref $index && $index->{slice};
 
-                if ( $index eq $TOKEN_ALL ) {
+                if (ref $index && $index->{union}) {
+                    my @union = @{$index->{union}};
+                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$obj}{@union};
+                }
+                elsif ( $index eq $TOKEN_ALL ) {
                     return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } values %{$obj};
                 }
                 else {
@@ -265,7 +273,11 @@ sub get_token {
             $start = $substream[0] // 0;
             $end   = $substream[2] // -1;
             $step  = $substream[4] // 1;
-            return [ $start, $end, $step ];
+            return { slice => [ $start, $end, $step ] };
+        }
+        elsif ( grep { $_ eq $TOKEN_UNION } @substream ) { 
+            my @union = grep { $_ ne $TOKEN_UNION } @substream;
+            return { union => \@union };
         }
 
         return $substream[0];

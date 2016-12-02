@@ -32,10 +32,14 @@ my @EXPRESSIONS = (
     '$..nonexistent'              => [],
     '$.store.book[0].title'       => [ $data{store}{book}->[0]{title} ],
     '$..book[-1:]'                => [ $data{store}{book}->[-1] ],
+    '$.array[0]'                  => [ $data{array}->[0] ],
+    '$.array[0,1]'                => [ @{ $data{array} }[ ( 0, 1 ) ] ],
+    '$.array[1:3]' => [ @{ $data{array} }[ ( 1 .. 3 ) ] ],
+    '$.array[-1:]' => [ $data{array}->[-1] ],
 );
 
-# my ($results2) = JSON::Path::Compiler->evaluate('$..book[-1:]', $object); 
-# 
+# my ($results2) = JSON::Path::Compiler->evaluate('$..book[-1:]', $object);
+#
 # is(ref $results2, 'HASH', "hashref value result");
 # is($results2->{isbn}, "0-395-19395-8", "hashref seems to be correct");
 
@@ -83,7 +87,9 @@ sub sample_json {
    "array" : [
       "alpha",
       "beta",
-      "gamma"
+      "gamma",
+      "delta",
+      "kappa"
    ],
    "complex_array" : [
       {
