@@ -70,7 +70,6 @@ Readonly my %OPERATORS => (
     $TOKEN_LESS_EQUAL          => $OPERATOR_TYPE_COMPARISON,    # <=
 );
 
-
 # EXPRESSION                                    TOKENS
 # $.[*].id                                      $ . [ * ] . id
 # $.[0].title                                   $ . [ 0 ] . title
@@ -99,11 +98,11 @@ sub _arraylike {
 sub evaluate {
     my ( $json_object, $expression, $want_ref ) = @_;
 
-    if (!ref $json_object) { 
-        try { 
+    if ( !ref $json_object ) {
+        try {
             $json_object = decode_json($json_object);
         }
-        catch { 
+        catch {
             croak qq{Unable to decode $json_object as JSON: $_};
         }
     }
@@ -148,16 +147,15 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                 }
             }
 
-            
             # Treat as @.foo IS TRUE
-            my $rhs = pop @sub_stream;
+            my $rhs      = pop @sub_stream;
             my $operator = pop @sub_stream;
 
             # This assumes that RHS is only a single token. I think that's a safe assumption.
-            if ($OPERATORS{$operator} eq $OPERATOR_TYPE_COMPARISON) { 
+            if ( $OPERATORS{$operator} eq $OPERATOR_TYPE_COMPARISON ) {
                 $rhs = normalize($rhs);
             }
-            else { 
+            else {
                 push @sub_stream, $operator, $rhs;
                 $operator = $OPERATOR_IS_TRUE;
             }
@@ -182,28 +180,34 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
         }
         else {
             my $index = normalize($token);
-            
+
             assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
             assert( ref $index eq 'HASH', q{Index is a hashref} ) if $ASSERT_ENABLE && ref $index;
 
             if ( _arraylike($obj) ) {
-                if ( ref $index && $index->{slice} ) { 
-                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } _slice($obj, $index->{slice});
-                }
-                elsif ( ref $index && $index->{union} ) { 
-                    my @union = @{$index->{union}};
-                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$obj}[@union];
-                }
-                elsif ( $index eq $TOKEN_ALL ) {
-                    return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } ( 0 .. $#{$obj} );
+                if ( ref $index || $index eq $TOKEN_ALL ) {
+                    my @indices;
+                    if ( $index eq $TOKEN_ALL ) {
+                        @indices = ( 0 .. $#{$obj} );
+                    }
+                    elsif ( $index->{slice} ) {
+                        @indices = _slice( scalar @{$obj}, $index->{slice} );
+                    }
+                    elsif ( $index->{union} ) {
+                        @indices = @{ $index->{union} };
+                    }
+                    else { assert( 0, q{Handling a slice or a union} ) if $ASSERT_ENABLE }
+
+                    my @evaluands = map { ( $want_ref && !ref $obj->[$_] ) ? \( $obj->[$_] ) : $obj->[$_] } @indices;
+                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @evaluands;
                 }
                 else {
                     return unless looks_like_number($index);
-                    
+
                     # If we have found a scalar at the end of the path but we want a ref, pass a reference to
                     # that scalar.
                     my $evaluand = ( $want_ref && !ref $obj->[$index] ) ? \( $obj->[$index] ) : $obj->[$index];
-                    
+
                     return $self->_evaluate( $evaluand, $token_stream, $want_ref );
                 }
             }
@@ -211,8 +215,8 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                 assert( _hashlike($obj) ) if $ASSERT_ENABLE;
                 croak q{Slices are not supported on hash-like objects} if ref $index && $index->{slice};
 
-                if (ref $index && $index->{union}) {
-                    my @union = @{$index->{union}};
+                if ( ref $index && $index->{union} ) {
+                    my @union = @{ $index->{union} };
                     return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$obj}{@union};
                 }
                 elsif ( $index eq $TOKEN_ALL ) {
@@ -241,17 +245,18 @@ sub get_token {
     if ( $token eq $TOKEN_SUBSCRIPT_OPEN ) {
         my @substream;
         my $close_seen;
-        while (defined( my $token = shift @{$token_stream})) {
-            if ($token eq $TOKEN_SUBSCRIPT_CLOSE) {
+        while ( defined( my $token = shift @{$token_stream} ) ) {
+            if ( $token eq $TOKEN_SUBSCRIPT_CLOSE ) {
                 $close_seen = 1;
                 last;
             }
             push @substream, $token;
         }
 
-        assert( $close_seen ) if $ASSERT_ENABLE;
+        assert($close_seen) if $ASSERT_ENABLE;
 
         if ( grep { $_ eq $TOKEN_ARRAY_SLICE } @substream ) {
+
             # There are five valid cases:
             #
             # n:m   -> n:m:1
@@ -275,7 +280,7 @@ sub get_token {
             $step  = $substream[4] // 1;
             return { slice => [ $start, $end, $step ] };
         }
-        elsif ( grep { $_ eq $TOKEN_UNION } @substream ) { 
+        elsif ( grep { $_ eq $TOKEN_UNION } @substream ) {
             my @union = grep { $_ ne $TOKEN_UNION } @substream;
             return { union => \@union };
         }
@@ -285,20 +290,30 @@ sub get_token {
     return $token;
 }
 
+# See http://wiki.ecmascript.org/doku.php?id=proposals:slice_syntax
+#
+# in particular, for the slice [n:m], m is *one greater* than the last index to slice.
+# This means that the slice [3:5] will return indices 3 and 4, but *not* 5.
 sub _slice {
-    my ( $array, $spec ) = @_;
+    my ( $length, $spec ) = @_;
     my ( $start, $end, $step ) = @{$spec};
-    $start = $#{$array} if $start == -1;
-    $end = $#{$array} if $end == -1;
-    my @indices;
-    if ($step < 0) { 
-        @indices = grep { %_ % -$step == 0 } reverse ( $start .. $end );
-    } 
-    else { 
-        @indices = grep { $_ % $step == 0 } ( $start .. $end );
-    }
 
-    return @{$array}[@indices];
+    # start, end, and step are set in get_token
+    assert(defined $start) if $ASSERT_ENABLE;
+    assert(defined $end) if $ASSERT_ENABLE;
+    assert(defined $step) if $ASSERT_ENABLE;
+
+    $start = ($length - 1) if $start == -1;
+    $end   = $length if $end == -1;
+
+    my @indices;
+    if ( $step < 0 ) {
+        @indices = grep { %_ % -$step == 0 } reverse( $start .. ($end - 1) );
+    }
+    else {
+        @indices = grep { $_ % $step == 0 } ( $start .. ($end - 1) );
+    }
+    return @indices;
 }
 
 sub _match_recursive {
@@ -306,12 +321,13 @@ sub _match_recursive {
     my @match;
     if ( _arraylike($obj) ) {
         for ( 0 .. $#{$obj} ) {
-            push @match, $want_ref ? \( $obj->[$_] ) : $obj->[$_] if $_ eq $index;
+            push @match, ( $want_ref && !ref $obj->[$_] ) ? \( $obj->[$_] ) : $obj->[$_] if $_ eq $index;
             push @match, _match_recursive( $obj->[$_], $index, $want_ref );
         }
     }
     elsif ( _hashlike($obj) ) {
-        push @match, $want_ref ? \( $obj->{$index} ) : $obj->{$index} if exists $obj->{$index};
+        push @match, ( $want_ref && !ref $obj->{$index} ) ? \( $obj->{$index} ) : $obj->{$index}
+            if exists $obj->{$index};
         push @match, _match_recursive( $_, $index, $want_ref ) for values %{$obj};
     }
     return @match;
@@ -331,7 +347,7 @@ sub normalize {
 sub compare {
     my ( $operator, $lhs, $rhs ) = @_;
 
-    if ($operator eq $OPERATOR_IS_TRUE) { 
+    if ( $operator eq $OPERATOR_IS_TRUE ) {
         return $lhs ? 1 : 0;
     }
 
