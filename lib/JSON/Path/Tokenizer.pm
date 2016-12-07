@@ -26,6 +26,7 @@ Readonly my %RESERVED_SYMBOLS => (
     $LESS_THAN_SIGN       => 1,
 );
 
+# ABSTRACT: Helper class for JSON::Path::Evaluator. Do not call directly.
 
 # Take an expression and break it up into tokens
 sub tokenize {
