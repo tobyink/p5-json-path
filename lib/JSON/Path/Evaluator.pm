@@ -6,6 +6,7 @@ use 5.008;
 
 use Carp;
 use Carp::Assert qw(assert);
+use Exporter::Tiny ();
 use JSON::MaybeXS;
 use JSON::Path::Constants qw(:operators);
 use JSON::Path::Tokenizer qw(tokenize);
@@ -15,8 +16,11 @@ use Scalar::Util qw/looks_like_number blessed/;
 use Storable qw/dclone/;
 use Sys::Hostname qw/hostname/;
 use Try::Tiny;
+
 our $AUTHORITY = 'cpan:POPEFELIX';
 our $VERSION   = '1.00';
+our @ISA       = qw/ Exporter::Tiny /;
+our @EXPORT_OK = qw/ evaluate_jsonpath /;
 
 Readonly my $OPERATOR_IS_TRUE         => 'IS_TRUE';
 Readonly my $OPERATOR_TYPE_PATH       => 1;
@@ -54,9 +58,9 @@ sub new {
         croak qq{Missing required argument '$key' in constructor} unless $args{$key};
         $self->{$key} = $args{$key};
     }
-    $self->{want_ref} = $args{want_ref} || 0;
+    $self->{want_ref}         = $args{want_ref}         || 0;
     $self->{_calling_context} = $args{_calling_context} || 0;
-    $self->{script_engine} = $args{script_engine} || 'PseudoJS';
+    $self->{script_engine}    = $args{script_engine}    || 'PseudoJS';
     bless $self, $class;
     return $self;
 }
@@ -111,7 +115,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
         next                                       if $token eq $TOKEN_CHILD;
         assert( $token ne $TOKEN_SUBSCRIPT_OPEN )  if $ASSERT_ENABLE;
         assert( $token ne $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
-    
+
         if ( $token eq $TOKEN_ROOT ) {
             return $self->_evaluate( $self->{root}, $token_stream, $want_ref );
         }
@@ -132,27 +136,28 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             }
 
             my @matching_indices;
-            if ($self->{script_engine} eq 'PseudoJS') { 
+            if ( $self->{script_engine} eq 'PseudoJS' ) {
                 @matching_indices = $self->_process_pseudo_js( $obj, [@sub_stream] );
             }
-            elsif ($self->{script_engine} eq 'perl') { 
-                @matching_indices = $self->_process_perl($obj, [@sub_stream]);
+            elsif ( $self->{script_engine} eq 'perl' ) {
+                @matching_indices = $self->_process_perl( $obj, [@sub_stream] );
             }
-            else { 
+            else {
                 croak qq{Unsupported script engine "$self->{script_engine}"};
             }
 
-            if (!@{$token_stream}) { 
+            if ( !@{$token_stream} ) {
                 return $want_ref ? map { \( $obj->[$_] ) } @matching_indices : map { $obj->[$_] } @matching_indices;
             }
+
             # Evaluate the token stream on all elements that pass the comparison in compare()
             return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } @matching_indices;
         }
         elsif ( $token eq $TOKEN_RECURSIVE ) {
             my $index = _get_token($token_stream);
-          
+
             my $matched = [ _match_recursive( $obj, $index, $want_ref ) ];
-            if (!scalar @{$token_stream}) { 
+            if ( !scalar @{$token_stream} ) {
                 return @{$matched};
             }
             return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$matched};
@@ -163,24 +168,24 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
             assert( ref $index eq 'HASH', q{Index is a hashref} ) if $ASSERT_ENABLE && ref $index;
 
-            if (!@{$token_stream}) { 
-                my $got = _get($obj, $index);
-                if (ref $got eq 'ARRAY') { 
+            if ( !@{$token_stream} ) {
+                my $got = _get( $obj, $index );
+                if ( ref $got eq 'ARRAY' ) {
                     return $want_ref ? @{$got} : map { ${$_} } @{$got};
                 }
-                else { 
-                    return if $want_ref && !${$got}; # KLUDGE
+                else {
+                    return if $want_ref && !${$got};    # KLUDGE
 
                     return $want_ref ? $got : ${$got};
                 }
             }
-            else { 
-                my $got = _get($obj, $index);
-                if (ref $got eq 'ARRAY') { 
-                    return map { $self->_evaluate( ${$_}, dclone ($token_stream), $want_ref ) } @{$got};
+            else {
+                my $got = _get( $obj, $index );
+                if ( ref $got eq 'ARRAY' ) {
+                    return map { $self->_evaluate( ${$_}, dclone($token_stream), $want_ref ) } @{$got};
                 }
-                else { 
-                    return $self->_evaluate(${$got}, dclone($token_stream), $want_ref );
+                else {
+                    return $self->_evaluate( ${$got}, dclone($token_stream), $want_ref );
                 }
             }
         }
@@ -190,14 +195,14 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 sub _get {
     my ( $object, $index ) = @_;
 
-    $object = ${$object} if ref $object eq 'REF'; # KLUDGE
+    $object = ${$object} if ref $object eq 'REF';    # KLUDGE
 
     assert( _hashlike($object) || _arraylike($object), 'Object is a hashref or an arrayref' ) if $ASSERT_ENABLE;
 
     my $scalar_context;
     my @indices;
     if ( $index eq $TOKEN_ALL ) {
-        @indices = keys( %{$object} ) if _hashlike($object);
+        @indices = keys( %{$object} )   if _hashlike($object);
         @indices = ( 0 .. $#{$object} ) if _arraylike($object);
     }
     elsif ( ref $index ) {
@@ -221,10 +226,10 @@ sub _get {
         return unless @indices;
 
         my ($index) = @indices;
-        if (_hashlike($object)) { 
+        if ( _hashlike($object) ) {
             return \( $object->{$index} );
         }
-        else { 
+        else {
             no warnings qw/numeric/;
             return \( $object->[$index] );
             use warnings qw/numeric/;
@@ -233,10 +238,10 @@ sub _get {
     else {
         return [] unless @indices;
 
-        if (_hashlike($object)) {
+        if ( _hashlike($object) ) {
             return [ map { \( $object->{$_} ) } @indices ];
         }
-        else { 
+        else {
             my @ret;
             return [ map { \( $object->[$_] ) } grep { looks_like_number($_) } @indices ];
         }
@@ -252,7 +257,6 @@ sub _arraylike {
     my $object = shift;
     return ( ref $object eq 'ARRAY' || ( blessed $object && $object->can('typeof') && $object->typeof eq 'ARRAY' ) );
 }
-
 
 sub _get_token {
     my $token_stream = shift;
@@ -344,10 +348,10 @@ sub _match_recursive {
         }
     }
     elsif ( _hashlike($obj) ) {
-        if (exists $obj->{$index}) {
-            push @match, $want_ref ? \($obj->{$index}) : $obj->{$index};
+        if ( exists $obj->{$index} ) {
+            push @match, $want_ref ? \( $obj->{$index} ) : $obj->{$index};
         }
-        for my $val (values %{$obj}) {
+        for my $val ( values %{$obj} ) {
             next unless ref $val;
             push @match, _match_recursive( $val, $index, $want_ref );
         }
@@ -397,19 +401,19 @@ sub _process_pseudo_js {
 
     return @matching;
 }
-	
-sub _process_perl { 
-    my ($self, $object, $token_stream) = @_;
 
-    assert(_arraylike($object), q{Object is an arrayref}) if $ASSERT_ENABLE;
+sub _process_perl {
+    my ( $self, $object, $token_stream ) = @_;
+
+    assert( _arraylike($object), q{Object is an arrayref} ) if $ASSERT_ENABLE;
 
     my $code = join '', @{$token_stream};
     my $cpt = Safe->new;
-    $cpt->permit_only(':base_core', qw/padsv padav padhv padany/);
-    ${$cpt->varglob('root')} = dclone($self->{root});
-    
+    $cpt->permit_only( ':base_core', qw/padsv padav padhv padany/ );
+    ${ $cpt->varglob('root') } = dclone( $self->{root} );
+
     my @matching;
-    for my $index (0 .. $#{$object}) {
+    for my $index ( 0 .. $#{$object} ) {
         local $_ = $object->[$index];
         my $ret = $cpt->reval($code);
         croak qq{Error in filter: $@} if $@;
@@ -417,7 +421,7 @@ sub _process_perl {
     }
     return @matching;
 }
-    
+
 sub _compare {
     my ( $operator, $lhs, $rhs ) = @_;
 

@@ -27,12 +27,12 @@ my $person = { name => "Robert", foo => { bar => [ 1, 2, 3 ] } };
 my $path = JSON::Path->new('$.name');
 $path->value($person) = "Bob";
 
-is_deeply( $person, { name => "Bob" , foo => { bar => [ 1, 2, 3 ] } }  );
+is_deeply( $person, { name => "Bob", foo => { bar => [ 1, 2, 3 ] } } );
 
-jpath1( $person, '$.name' ) = "Robbie";
+jpath1( $person, '$.name' )    = "Robbie";
 jpath1( $person, '$.foo.bar' ) = 12;
 
-is_deeply( $person, { name => "Robbie", foo => { bar => 12 } });
+is_deeply( $person, { name => "Robbie", foo => { bar => 12 } } );
 
 done_testing;
 
