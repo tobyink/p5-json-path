@@ -1,3 +1,4 @@
+
 =head1 PURPOSE
 
 Some basic Tests for handling of unicode characters in JSON data.
@@ -17,7 +18,7 @@ terms as Perl itself.
 =cut
 
 use Test::More tests => 5;
-BEGIN { use_ok('JSON::Path') };
+BEGIN { use_ok('JSON::Path') }
 
 use JSON::MaybeXS;
 my $data = <<"JSON";
@@ -49,15 +50,15 @@ utf8::encode($data);
 my $object = decode_json($data);
 
 my $path1 = JSON::Path->new('$.store.book[0].title');
-is("$path1", '$.store.book[0].title', "overloaded stringification");
+is( "$path1", '$.store.book[0].title', "overloaded stringification" );
 
 my @results1 = $path1->values($object);
-is($results1[0], "Einf\xFChrung in Perl", "basic value result");
+is( $results1[0], "Einf\xFChrung in Perl", "basic value result" );
 
 @results1 = $path1->paths($object);
-is($results1[0], "\$['store']['book']['0']['title']", "basic path result");
+is( $results1[0], "\$['store']['book']['0']['title']", "basic path result" );
 
-my $path2 = JSON::Path->new('$.store.book[1].author');
+my $path2    = JSON::Path->new('$.store.book[1].author');
 my @results2 = $path2->values($object);
-is($results2[0], "\x{61}\x{0300}\x{0320}. u. thor", "basic value result");
+is( $results2[0], "\x{61}\x{0300}\x{0320}. u. thor", "basic value result" );
 
