@@ -9,7 +9,7 @@ our $VERSION   = '0.205';
 our $Safe      = 1;
 
 use Carp;
-use JSON qw[from_json];
+use JSON::MaybeXS qw[decode_json];
 use Scalar::Util qw[blessed];
 use LV ();
 
@@ -54,7 +54,7 @@ sub to_string
 sub _get
 {
 	my ($self, $object, $type) = @_;
-	$object = from_json($object) unless ref $object;
+	$object = decode_json($object) unless ref $object;
 	
 	my $helper = JSON::Path::Helper->new;
 	$helper->{'resultType'} = $type;
@@ -482,13 +482,15 @@ JSON::Path - search nested hashref/arrayref structures using JSONPath
       },
     ],
     "bicycle" => [
-      { "color": "red",
-        "price": 19.95,
+      { "color" => "red",
+        "price" => 19.95,
       },
     ],
   },
  };
  
+ use JSON::Path 'jpath_map';
+
  # All books in the store
  my $jpath   = JSON::Path->new('$.store.book[*]');
  my @books   = $jpath->values($data);
@@ -498,8 +500,7 @@ JSON::Path - search nested hashref/arrayref structures using JSONPath
  my $tolkien = $jpath->value($data);
  
  # Convert all authors to uppercase
- use JSON::Path 'jpath_map';
- jpath_map { uc $_ } $object, '$.store.book[*].author';
+ jpath_map { uc $_ } $data, '$.store.book[*].author';
 
 =head1 DESCRIPTION
 
@@ -526,7 +527,8 @@ Given a JSONPath expression $string, returns a JSON::Path object.
 
 Evaluates the JSONPath expression against an object. The object $object
 can be either a nested Perl hashref/arrayref structure, or a JSON string
-capable of being decoded by JSON::from_json.
+capable of being decoded by JSON::MaybeXS decode_json (meaning especially
+that it should be UTF-8 encoded!).
 
 Returns a list of structures from within $object which match against the
 JSONPath expression. In scalar context, returns the number of matches.
