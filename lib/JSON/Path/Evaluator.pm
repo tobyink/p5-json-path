@@ -20,8 +20,9 @@ use Storable qw/dclone/;
 use Sys::Hostname qw/hostname/;
 use Try::Tiny;
 
+# VERSION
+
 our $AUTHORITY = 'cpan:POPEFELIX';
-our $VERSION   = '1.00';
 our @ISA       = qw/ Exporter::Tiny /;
 our @EXPORT_OK = qw/ evaluate_jsonpath /;
 

@@ -4,8 +4,9 @@ use warnings;
 
 package JSON::Path;
 
-our $AUTHORITY = 'cpan:TOBYINK';
-our $VERSION   = '0.205';
+# VERSION
+
+our $AUTHORITY = 'cpan:POPEFELIX';
 our $Safe      = 1;
 
 use Carp;
