@@ -54,6 +54,7 @@ sub new {
         $self->{$key} = $args{$key};
     }
     $self->{want_ref} = $args{want_ref} || 0;
+    $self->{_calling_context} = $args{_calling_context} || 0;
     bless $self, $class;
     return $self;
 }
@@ -89,7 +90,11 @@ sub evaluate {
         }
     }
 
-    my $self = __PACKAGE__->new( root => $json_object, expression => $expression );
+    my $self = __PACKAGE__->new(
+        root             => $json_object,
+        expression       => $expression,
+        _calling_context => wantarray ? 'ARRAY' : 'SCALAR'
+    );
     return $self->_evaluate( $json_object, [ tokenize($expression) ], $want_ref );
 }
 
@@ -98,28 +103,22 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
     $token_stream ||= [];
 
-    if ( !@{$token_stream} ) {
-        if ( !ref $obj ) {
-            return $want_ref ? \$obj : $obj;
-        }
-        else {
-            return $want_ref ? $obj : dclone($obj);
-        }
-    }
-
-    while ( defined( my $token = get_token($token_stream) ) ) {
+    while ( defined( my $token = _get_token($token_stream) ) ) {
         next                                       if $token eq $TOKEN_CURRENT;
         next                                       if $token eq $TOKEN_CHILD;
         assert( $token ne $TOKEN_SUBSCRIPT_OPEN )  if $ASSERT_ENABLE;
         assert( $token ne $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
+    
         if ( $token eq $TOKEN_ROOT ) {
             return $self->_evaluate( $self->{root}, $token_stream, $want_ref );
         }
         elsif ( $token eq $TOKEN_FILTER_OPEN ) {
+            confess q{Filters not supported on hashrefs} if _hashlike($obj);
+
             my @sub_stream;
 
             # Build a stream of just the tokens between the filter open and close
-            while ( defined( my $token = get_token($token_stream) ) ) {
+            while ( defined( my $token = _get_token($token_stream) ) ) {
                 last if $token eq $TOKEN_FILTER_SCRIPT_CLOSE;
                 if ( $token eq $TOKEN_CURRENT ) {
                     push @sub_stream, $token, $TOKEN_CHILD, $TOKEN_ALL;
@@ -142,23 +141,33 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                 $operator = $OPERATOR_IS_TRUE;
             }
 
+            my $index = normalize(pop @sub_stream);
+            my $separator = pop @sub_stream;
+
             # Evaluate the left hand side of the comparison first. NOTE: We DO NOT want to set $want_ref here.
             my @lhs = $self->_evaluate( $obj, [@sub_stream] );
 
-            # FIXME: What if $obj is not an array?
-
             # get indexes that pass compare()
-            my @matching = grep { compare( $operator, $lhs[$_], $rhs ) } ( 0 .. $#lhs );
+            my @matching;
+            for (0 .. $#lhs) { 
+                my $val = ${_get($lhs[$_], $index)};
+                push @matching, $_ if _compare($operator, $val, $rhs);
+            }
 
+            if (!@{$token_stream}) { 
+                return $want_ref ? map { \( $obj->[$_] ) } @matching : map { $obj->[$_] } @matching;
+            }
             # Evaluate the token stream on all elements that pass the comparison in compare()
-            my @ret = map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } @matching;
-            return @ret;
+            return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } @matching;
         }
         elsif ( $token eq $TOKEN_RECURSIVE ) {
-            my $index = get_token($token_stream);
-            my @ret = map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) }
-                _match_recursive( $obj, $index, $want_ref );
-            return @ret;
+            my $index = _get_token($token_stream);
+          
+            my $matched = [ _match_recursive( $obj, $index, $want_ref ) ];
+            if (!scalar @{$token_stream}) { 
+                return @{$matched};
+            }
+            return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$matched};
         }
         else {
             my $index = normalize($token);
@@ -166,58 +175,83 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
             assert( ref $index eq 'HASH', q{Index is a hashref} ) if $ASSERT_ENABLE && ref $index;
 
-            if ( _arraylike($obj) ) {
-                if ( ref $index || $index eq $TOKEN_ALL ) {
-                    my @indices;
-                    if ( $index eq $TOKEN_ALL ) {
-                        @indices = ( 0 .. $#{$obj} );
-                    }
-                    elsif ( $index->{slice} ) {
-                        @indices = _slice( scalar @{$obj}, $index->{slice} );
-                    }
-                    elsif ( $index->{union} ) {
-                        @indices = @{ $index->{union} };
-                    }
-                    else { assert( 0, q{Handling a slice or a union} ) if $ASSERT_ENABLE }
-
-                    my @evaluands = map { ( $want_ref && !ref $obj->[$_] ) ? \( $obj->[$_] ) : $obj->[$_] } @indices;
-                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @evaluands;
+            if (!@{$token_stream}) { 
+                my $got = _get($obj, $index);
+                if (ref $got eq 'ARRAY') { 
+                    return $want_ref ? @{$got} : map { ${$_} } @{$got};
                 }
-                else {
-                    return unless looks_like_number($index);
+                else { 
+                    return if $want_ref && !${$got}; # KLUDGE
 
-                    # If we have found a scalar at the end of the path but we want a ref, pass a reference to
-                    # that scalar.
-                    my $evaluand = ( $want_ref && !ref $obj->[$index] ) ? \( $obj->[$index] ) : $obj->[$index];
-
-                    return $self->_evaluate( $evaluand, $token_stream, $want_ref );
+                    return $want_ref ? $got : ${$got};
                 }
             }
-            else {
-                assert( _hashlike($obj) ) if $ASSERT_ENABLE;
-                croak q{Slices are not supported on hash-like objects} if ref $index && $index->{slice};
-
-                if ( ref $index && $index->{union} ) {
-                    my @union = @{ $index->{union} };
-                    my @evaluands = map { ( $want_ref && !ref $obj->{$_} ) ? \( $obj->{$_} ) : $obj->{$_} } @union;
-                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @evaluands;
+            else { 
+                my $got = _get($obj, $index);
+                if (ref $got eq 'ARRAY') { 
+                    return map { $self->_evaluate( ${$_}, dclone ($token_stream), $want_ref ) } @{$got};
                 }
-                elsif ( $index eq $TOKEN_ALL ) {
-                    return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } values %{$obj};
-                }
-                else {
-                    return unless exists $obj->{$index};
-
-                    # If we have found a scalar at the end of the path but we want a ref, pass a reference to
-                    # that scalar.
-                    my $evaluand = ( $want_ref && !ref $obj->{$index} ) ? \( $obj->{$index} ) : $obj->{$index};
-
-                    return $self->_evaluate( $evaluand, $token_stream, $want_ref );
+                else { 
+                    return $self->_evaluate(${$got}, dclone($token_stream), $want_ref );
                 }
             }
         }
     }
     1;
+}
+
+sub _get {
+    my ( $object, $index ) = @_;
+
+    $object = ${$object} if ref $object eq 'REF'; # KLUDGE
+
+    assert( _hashlike($object) || _arraylike($object), 'Object is a hashref or an arrayref' ) if $ASSERT_ENABLE;
+
+    my $scalar_context;
+    my @indices;
+    if ( $index eq $TOKEN_ALL ) {
+        @indices = keys( %{$object} ) if _hashlike($object);
+        @indices = ( 0 .. $#{$object} ) if _arraylike($object);
+    }
+    elsif ( ref $index ) {
+        assert( ref $index eq 'HASH', q{Index supplied in a hashref} ) if $ASSERT_ENABLE;
+        if ( $index->{union} ) {
+            @indices = @{ $index->{union} };
+        }
+        elsif ( $index->{slice} ) {
+            confess qq(Slices not supported for hashlike objects) if _hashlike($object);
+            @indices = _slice( scalar @{$object}, $index->{slice} );
+        }
+        else { assert( 0, q{Handling a slice or a union} ) if $ASSERT_ENABLE }
+    }
+    else {
+        $scalar_context = 1;
+        @indices        = ($index);
+    }
+    @indices = grep { looks_like_number($_) } @indices if _arraylike($object);
+
+    if ($scalar_context) {
+        return unless @indices;
+
+        my ($index) = @indices;
+        if (_hashlike($object)) { 
+            return \( $object->{$index} );
+        }
+        else { 
+            return \( $object->[$index] );
+        }
+    }
+    else {
+        return [] unless @indices;
+
+        if (_hashlike($object)) {
+            return [ map { \( $object->{$_} ) } @indices ];
+        }
+        else { 
+            my @ret;
+            return [ map { \( $object->[$_] ) } grep { looks_like_number($_) } @indices ];
+        }
+    }
 }
 
 sub _hashlike {
@@ -231,7 +265,7 @@ sub _arraylike {
 }
 
 
-sub get_token {
+sub _get_token {
     my $token_stream = shift;
     my $token        = shift @{$token_stream};
     return unless defined $token;
@@ -312,17 +346,22 @@ sub _slice {
 
 sub _match_recursive {
     my ( $obj, $index, $want_ref ) = @_;
+
     my @match;
     if ( _arraylike($obj) ) {
         for ( 0 .. $#{$obj} ) {
-            push @match, ( $want_ref && !ref $obj->[$_] ) ? \( $obj->[$_] ) : $obj->[$_] if $_ eq $index;
+            next unless ref $obj->[$_];
             push @match, _match_recursive( $obj->[$_], $index, $want_ref );
         }
     }
     elsif ( _hashlike($obj) ) {
-        push @match, ( $want_ref && !ref $obj->{$index} ) ? \( $obj->{$index} ) : $obj->{$index}
-            if exists $obj->{$index};
-        push @match, _match_recursive( $_, $index, $want_ref ) for values %{$obj};
+        if (exists $obj->{$index}) {
+            push @match, $want_ref ? \($obj->{$index}) : $obj->{$index};
+        }
+        for my $val (values %{$obj}) {
+            next unless ref $val;
+            push @match, _match_recursive( $val, $index, $want_ref );
+        }
     }
     return @match;
 }
@@ -338,7 +377,7 @@ sub normalize {
     return $string;
 }
 
-sub compare {
+sub _compare {
     my ( $operator, $lhs, $rhs ) = @_;
 
     if ( $operator eq $OPERATOR_IS_TRUE ) {

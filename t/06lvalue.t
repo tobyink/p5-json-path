@@ -1,3 +1,4 @@
+
 =head1 PURPOSE
 
 Basic tests for some of the lvalue stuff.
@@ -22,15 +23,17 @@ use Test::More;
 
 use JSON::Path -all;
 
-my $person = { name => "Robert" };
+my $person = { name => "Robert", foo => { bar => [ 1, 2, 3 ] } };
 my $path = JSON::Path->new('$.name');
 $path->value($person) = "Bob";
+my $path2 = JSON::Path->new('$.foo.bar');
+$path2->value($person) = '12';
 
-is_deeply($person, { name => "Bob" });
+is_deeply( $person, { name => "Bob" } );
 
-jpath1($person, '$.name') = "Robbie";
+jpath1( $person, '$.name' ) = "Robbie";
 
-is_deeply($person, { name => "Robbie" });
+is_deeply( $person, { name => "Robbie" } );
 
 done_testing;
 
