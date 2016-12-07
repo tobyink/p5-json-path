@@ -443,13 +443,15 @@ JSON::Path - search nested hashref/arrayref structures using JSONPath
       },
     ],
     "bicycle" => [
-      { "color": "red",
-        "price": 19.95,
+      { "color" => "red",
+        "price" => 19.95,
       },
     ],
   },
  };
  
+ use JSON::Path 'jpath_map';
+
  # All books in the store
  my $jpath   = JSON::Path->new('$.store.book[*]');
  my @books   = $jpath->values($data);
@@ -459,8 +461,7 @@ JSON::Path - search nested hashref/arrayref structures using JSONPath
  my $tolkien = $jpath->value($data);
  
  # Convert all authors to uppercase
- use JSON::Path 'jpath_map';
- jpath_map { uc $_ } $object, '$.store.book[*].author';
+ jpath_map { uc $_ } $data, '$.store.book[*].author';
 
 =head1 DESCRIPTION
 
