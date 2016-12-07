@@ -26,14 +26,13 @@ use JSON::Path -all;
 my $person = { name => "Robert", foo => { bar => [ 1, 2, 3 ] } };
 my $path = JSON::Path->new('$.name');
 $path->value($person) = "Bob";
-my $path2 = JSON::Path->new('$.foo.bar');
-$path2->value($person) = '12';
 
-is_deeply( $person, { name => "Bob" } );
+is_deeply( $person, { name => "Bob" , foo => { bar => [ 1, 2, 3 ] } }  );
 
 jpath1( $person, '$.name' ) = "Robbie";
+jpath1( $person, '$.foo.bar' ) = 12;
 
-is_deeply( $person, { name => "Robbie" } );
+is_deeply( $person, { name => "Robbie", foo => { bar => 12 } });
 
 done_testing;
 

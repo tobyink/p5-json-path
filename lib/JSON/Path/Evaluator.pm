@@ -10,6 +10,7 @@ use JSON::MaybeXS;
 use JSON::Path::Constants qw(:operators);
 use JSON::Path::Tokenizer qw(tokenize);
 use Readonly;
+use Safe;
 use Scalar::Util qw/looks_like_number blessed/;
 use Storable qw/dclone/;
 use Sys::Hostname qw/hostname/;
@@ -55,6 +56,7 @@ sub new {
     }
     $self->{want_ref} = $args{want_ref} || 0;
     $self->{_calling_context} = $args{_calling_context} || 0;
+    $self->{script_engine} = $args{script_engine} || 'PseudoJS';
     bless $self, $class;
     return $self;
 }
@@ -80,7 +82,7 @@ sub to_string {
 sub evaluate_jsonpath {
     my ( $json_object, $expression, %args ) = @_;
 
-    my $want_ref = $args{want_ref} || 0;
+    my $want_ref = delete $args{want_ref} || 0;
     if ( !ref $json_object ) {
         try {
             $json_object = decode_json($json_object);
@@ -93,7 +95,8 @@ sub evaluate_jsonpath {
     my $self = __PACKAGE__->new(
         root             => $json_object,
         expression       => $expression,
-        _calling_context => wantarray ? 'ARRAY' : 'SCALAR'
+        _calling_context => wantarray ? 'ARRAY' : 'SCALAR',
+        %args
     );
     return $self->_evaluate( $json_object, [ tokenize($expression) ], $want_ref );
 }
@@ -128,37 +131,22 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                 }
             }
 
-            # Treat as @.foo IS TRUE
-            my $rhs      = pop @sub_stream;
-            my $operator = pop @sub_stream;
-
-            # This assumes that RHS is only a single token. I think that's a safe assumption.
-            if ( $OPERATORS{$operator} eq $OPERATOR_TYPE_COMPARISON ) {
-                $rhs = normalize($rhs);
+            my @matching_indices;
+            if ($self->{script_engine} eq 'PseudoJS') { 
+                @matching_indices = $self->_process_pseudo_js( $obj, [@sub_stream] );
             }
-            else {
-                push @sub_stream, $operator, $rhs;
-                $operator = $OPERATOR_IS_TRUE;
+            elsif ($self->{script_engine} eq 'perl') { 
+                @matching_indices = $self->_process_perl($obj, [@sub_stream]);
             }
-
-            my $index = normalize(pop @sub_stream);
-            my $separator = pop @sub_stream;
-
-            # Evaluate the left hand side of the comparison first. NOTE: We DO NOT want to set $want_ref here.
-            my @lhs = $self->_evaluate( $obj, [@sub_stream] );
-
-            # get indexes that pass compare()
-            my @matching;
-            for (0 .. $#lhs) { 
-                my $val = ${_get($lhs[$_], $index)};
-                push @matching, $_ if _compare($operator, $val, $rhs);
+            else { 
+                croak qq{Unsupported script engine "$self->{script_engine}"};
             }
 
             if (!@{$token_stream}) { 
-                return $want_ref ? map { \( $obj->[$_] ) } @matching : map { $obj->[$_] } @matching;
+                return $want_ref ? map { \( $obj->[$_] ) } @matching_indices : map { $obj->[$_] } @matching_indices;
             }
             # Evaluate the token stream on all elements that pass the comparison in compare()
-            return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } @matching;
+            return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } @matching_indices;
         }
         elsif ( $token eq $TOKEN_RECURSIVE ) {
             my $index = _get_token($token_stream);
@@ -197,7 +185,6 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             }
         }
     }
-    1;
 }
 
 sub _get {
@@ -238,7 +225,9 @@ sub _get {
             return \( $object->{$index} );
         }
         else { 
+            no warnings qw/numeric/;
             return \( $object->[$index] );
+            use warnings qw/numeric/;
         }
     }
     else {
@@ -377,9 +366,62 @@ sub normalize {
     return $string;
 }
 
+sub _process_pseudo_js {
+    my ( $self, $object, $token_stream ) = @_;
+
+    # Treat as @.foo IS TRUE
+    my $rhs      = pop @{$token_stream};
+    my $operator = pop @{$token_stream};
+
+    # This assumes that RHS is only a single token. I think that's a safe assumption.
+    if ( $OPERATORS{$operator} eq $OPERATOR_TYPE_COMPARISON ) {
+        $rhs = normalize($rhs);
+    }
+    else {
+        push @{$token_stream}, $operator, $rhs;
+        $operator = $OPERATOR_IS_TRUE;
+    }
+
+    my $index     = normalize( pop @{$token_stream} );
+    my $separator = pop @{$token_stream};
+
+    # Evaluate the left hand side of the comparison first. .
+    my @lhs = $self->_evaluate( $object, dclone $token_stream );
+
+    # get indexes that pass compare()
+    my @matching;
+    for ( 0 .. $#lhs ) {
+        my $val = ${ _get( $lhs[$_], $index ) };
+        push @matching, $_ if _compare( $operator, $val, $rhs );
+    }
+
+    return @matching;
+}
+	
+sub _process_perl { 
+    my ($self, $object, $token_stream) = @_;
+
+    assert(_arraylike($object), q{Object is an arrayref}) if $ASSERT_ENABLE;
+
+    my $code = join '', @{$token_stream};
+    my $cpt = Safe->new;
+    $cpt->permit_only(':base_core', qw/padsv padav padhv padany/);
+    ${$cpt->varglob('root')} = dclone($self->{root});
+    
+    my @matching;
+    for my $index (0 .. $#{$object}) {
+        local $_ = $object->[$index];
+        my $ret = $cpt->reval($code);
+        croak qq{Error in filter: $@} if $@;
+        push @matching, $index if $cpt->reval($code);
+    }
+    return @matching;
+}
+    
 sub _compare {
     my ( $operator, $lhs, $rhs ) = @_;
 
+    no warnings qw/uninitialized/;
     if ( $operator eq $OPERATOR_IS_TRUE ) {
         return $lhs ? 1 : 0;
     }
@@ -404,6 +446,8 @@ sub _compare {
     if ( $operator eq '!=' || $operator eq '!==' ) {
         return $use_numeric ? ( $lhs != $rhs ) : $lhs ne $rhs;
     }
+    use warnings qw/uninitialized/;
 }
+
 1;
 __END__
