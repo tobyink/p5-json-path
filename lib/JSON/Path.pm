@@ -9,7 +9,8 @@ our $VERSION   = '0.205';
 our $Safe      = 1;
 
 use Carp;
-use JSON::MaybeXS qw[decode_json];
+use JSON::MaybeXS qw/decode_json/;
+use JSON::Path::Evaluator;
 use Scalar::Util qw[blessed];
 use LV ();
 
@@ -54,6 +55,8 @@ sub to_string
 sub _get
 {
 	my ($self, $object, $type) = @_;
+    confess qq{Unsupported result type "$type"} unless $type eq 'PATH';
+
 	$object = decode_json($object) unless ref $object;
 	
 	my $helper = JSON::Path::Helper->new;
@@ -73,50 +76,6 @@ sub _get
 	return;
 }
 
-sub _dive :lvalue
-{
-	my ($obj, $path) = @_;
-	
-	$path = [
-		$path =~ /\[(.+?)\]/g
-	] unless ref $path;
-	$path = [ map { /^'(.+)'$/ ? $1 : $_ } @$path ];
-	
-	while (@$path > 1)
-	{
-		my $chunk = shift @$path;
-		if (JSON::Path::Helper::isObject($obj))
-			{ $obj = $obj->{$chunk} }
-		elsif (JSON::Path::Helper::isArray($obj))
-			{ $obj = $obj->[$chunk] }
-		else
-			{ print "Huh?" }
-	}
-	
-	my $chunk = shift @$path;
-	
-	LV::lvalue(
-		get => sub
-		{
-			if (JSON::Path::Helper::isObject($obj))
-				{ $obj = $obj->{$chunk} }
-			elsif (JSON::Path::Helper::isArray($obj))
-				{ $obj = $obj->[$chunk] }
-			else
-				{ print "hUh?" }
-		},
-		set => sub
-		{
-			if (JSON::Path::Helper::isObject($obj))
-				{ $obj->{$chunk} = shift }
-			elsif (JSON::Path::Helper::isArray($obj))
-				{ $obj->[$chunk] = shift }
-			else
-				{ print "huH?" }
-		},
-	);
-}
-
 sub paths
 {
 	my ($self, $object) = @_;
@@ -126,16 +85,17 @@ sub paths
 sub get
 {
 	my ($self, $object) = @_;
-	return $self->_get($object, 'VALUE');
+    my @values = $self->values($object);
+    return wantarray ? @values : $values[0];
 }
 
 sub set
 {
 	my ($self, $object, $value, $limit) = @_;
 	my $count = 0;
-	foreach my $path ( $self->_get($object, 'PATH') )
-	{
-		_dive($object, $path) = $value;
+    my @refs = JSON::Path::Evaluator::evaluate_jsonpath($object, "$self", want_ref => 1);
+    for my $ref (@refs) {
+        ${$ref} = $value;
 		++$count;
 		last if $limit && ($count >= $limit);
 	}
@@ -154,7 +114,7 @@ sub value :lvalue
 		set => sub
 		{
 			my $value = shift;
-			$self->set($object, $value, 1);
+            $self->set($object, $value, 1);
 		},
 	);
 }
@@ -162,8 +122,9 @@ sub value :lvalue
 sub values
 {
 	my ($self, $object) = @_;
-	my @values = $self->get($object);
-	wantarray ? @values : scalar @values;
+    croak q{non-safe evaluation, died} if "$self" =~ /\?\(/ && $JSON::Path::Safe;
+        
+    return JSON::Path::Evaluator::evaluate_jsonpath($object, "$self", script_engine => 'perl');;
 }
 
 sub map
@@ -172,14 +133,15 @@ sub map
 	my $count;
 	foreach my $path ( $self->_get($object, 'PATH') )
 	{
+        my $ref = JSON::Path::Evaluator::evaluate_jsonpath($object, $path, want_ref => 1);
 		++$count;
 		my $value = do {
 			no warnings 'numeric';
-			local $_ = _dive($object, $path);
+			local $_ = ${$ref};
 			local $. = $path;
 			scalar $coderef->();
 		};
-		_dive($object, $path) = $value;
+        ${$ref} = $value;
 	}
 	return $count;
 }
@@ -410,7 +372,6 @@ BEGIN {
 	sub evalx
 	{
 		my ($self, $x, $v, $vname) = @_;
-		
 		croak('non-safe evaluation, died') if $JSON::Path::Safe;
 			
 		my $expr = $x;
@@ -527,8 +488,7 @@ Given a JSONPath expression $string, returns a JSON::Path object.
 
 Evaluates the JSONPath expression against an object. The object $object
 can be either a nested Perl hashref/arrayref structure, or a JSON string
-capable of being decoded by JSON::MaybeXS decode_json (meaning especially
-that it should be UTF-8 encoded!).
+capable of being decoded by JSON::MaybeXS::decode_json.
 
 Returns a list of structures from within $object which match against the
 JSONPath expression. In scalar context, returns the number of matches.

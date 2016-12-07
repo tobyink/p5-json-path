@@ -8,57 +8,80 @@ use Tie::IxHash;
 my $json = sample_json();
 my %data = %{ decode_json($json) };
 
-my @EXPRESSIONS = (
-    '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>
-        [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data{complex_array} } )[0] ) ],
-    '$.complex_array[?(@.weight > 10)]' => [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
-    '$.complex_array[?(@.weight > 10)].classification.quux' =>
-        [ map { $_->{classification}{quux} } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
-    '$..complex_array[?(@.weight > 10)].classification.quux' =>
-        [ map { $_->{classification}{quux} } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
+subtest filter => sub {
+    my @expressions = (
+        '$.complex_array[?(@.weight > 10)]' =>
+            [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
+        '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>
+            [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data{complex_array} } )[0] ) ],
+        '$.complex_array[?(@.weight > 10)].classification.quux' =>
+            [ map { $_->{classification}{quux} } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
+        '$.complex_array[?(@.quux)]' => [ grep { $_->{quux} } @{ $data{complex_array} } ],
+        '$..nonexistent'             => [],
+    );
+    do_test(@expressions);
+};
 
-    '$.*' => [ map { ref $_ ? dclone $_ : $_ } values %data ],
-    '$.simple'                    => [ $data{simple} ],
-    '$.long_hash.key1.subkey2'    => [ $data{long_hash}{key1}{subkey2} ],
-    '$.complex_array[?(@.quux)]'  => [ grep { $_->{quux} } @{ $data{complex_array} } ],
-    '$..key2.subkey1'             => ['2value1'],
-    '$.long_hash.key1'            => [ dclone $data{long_hash}{key1} ],
-    q{$.complex_array[0]['foo']}  => [ $data{complex_array}[0]{foo} ],
-    '$..foo'                      => [qw/bar baz bak/],
-    '$.multilevel_array.1.0.0'    => [ $data{multilevel_array}->[1][0][0] ],
-    '$.multilevel_array.0.1[0]'   => [ $data{multilevel_array}->[0][1][0] ],
-    '$.multilevel_array[0][0][1]' => [ $data{multilevel_array}->[0][0][1] ],
-    '$.nonexistent'               => [],
-    '$..nonexistent'              => [],
-    '$.store.book[0].title'       => [ $data{store}{book}->[0]{title} ],
-    '$..book[-1:]'                => [ $data{store}{book}->[-1] ],
-    '$.array[0]'                  => [ $data{array}->[0] ],
-    '$.array[0,1]'                => [ @{ $data{array} }[ ( 0, 1 ) ] ],
-    '$.array[1:3]' => [ @{ $data{array} }[ ( 1 .. 2 ) ] ],
-    '$.array[-1:]' => [ $data{array}->[-1] ],
-    '$.store.book[*].title' => [ map { $_->{title} } @{ $data{store}{book} } ],
-    '$.long_hash.key1[subkey1,subkey2]' => [ @{$data{long_hash}{key1}}{qw/subkey1 subkey2/} ],
-);
+subtest simple => sub {
+    my @expressions = (
+        '$.simple'                    => [ $data{simple} ],
+        '$.long_hash.key1.subkey2'    => [ $data{long_hash}{key1}{subkey2} ],
+        '$.long_hash.key1'            => [ dclone $data{long_hash}{key1} ],
+        q{$.complex_array[0]['foo']}  => [ $data{complex_array}[0]{foo} ],
+        '$.multilevel_array.1.0.0'    => [ $data{multilevel_array}->[1][0][0] ],
+        '$.multilevel_array.0.1[0]'   => [ $data{multilevel_array}->[0][1][0] ],
+        '$.multilevel_array[0][0][1]' => [ $data{multilevel_array}->[0][0][1] ],
+        '$.nonexistent'               => [undef],
+        '$.store.book[0].title'       => [ $data{store}{book}->[0]{title} ],
+        '$.array[0]'                  => [ $data{array}->[0] ],
+    );
+    do_test(@expressions);
+};
 
-# my ($results2) = JSON::Path::Evaluator->evaluate('$..book[-1:]', $object);
-#
-# is(ref $results2, 'HASH', "hashref value result");
-# is($results2->{isbn}, "0-395-19395-8", "hashref seems to be correct");
+subtest all => sub {
+    my @expressions = (
+        '$.*' => [ map { ref $_ ? dclone $_ : $_ } values %data ],
+        '$.store.book[*].title' => [ map { $_->{title} } @{ $data{store}{book} } ],
+    );
+    do_test(@expressions);
+};
 
-while ( my $expression = shift @EXPRESSIONS ) {
-    my $expected = shift @EXPRESSIONS;
-    subtest $expression => sub {
-        my @got;
-        lives_ok {
-            @got = JSON::Path::Evaluator::evaluate( $json, $expression );
-        }
-        q{evaluate() did not die};
+subtest recursive => sub {
+    my @expressions = (
+        '$..foo' => [qw/bar baz bak/],
+        '$..complex_array[?(@.weight > 10)].classification.quux' =>
+            [ map { $_->{classification}{quux} } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
+        '$..key2.subkey1' => ['2value1'],
+        '$..book[-1:]'    => [ $data{store}{book}->[-1] ],
+    );
+    do_test(@expressions);
+};
 
-        cmp_bag( \@got, $expected, q{Expression evaluated correctly} );
-    };
-}
+subtest 'slice and union' => sub {
+    my @expressions = (
+        '$.array[0,1]' => [ @{ $data{array} }[ ( 0, 1 ) ] ],
+        '$.array[1:3]' => [ @{ $data{array} }[ ( 1 .. 2 ) ] ],
+        '$.array[-1:]' => [ $data{array}->[-1] ],
+        '$.long_hash.key1[subkey1,subkey2]' => [ @{ $data{long_hash}{key1} }{qw/subkey1 subkey2/} ],
+    );
+    do_test(@expressions);
+};
 
 done_testing;
+
+sub do_test {
+    my @expressions = @_;
+    while ( my $expression = shift @expressions ) {
+        my $expected = shift @expressions;
+        my @got;
+        lives_and {
+            @got = JSON::Path::Evaluator::evaluate_jsonpath( $json, $expression );
+            cmp_bag( \@got, $expected );
+        }
+        qq{"$expression" evaluated correctly};
+
+    }
+}
 
 sub sample_json {
 
