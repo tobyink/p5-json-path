@@ -75,7 +75,7 @@ sub do_test {
         my $expected = shift @expressions;
         my @got;
         lives_and {
-            @got = JSON::Path::Evaluator::evaluate( $json, $expression );
+            @got = JSON::Path::Evaluator::evaluate_jsonpath( $json, $expression );
             cmp_bag( \@got, $expected );
         }
         qq{"$expression" evaluated correctly};

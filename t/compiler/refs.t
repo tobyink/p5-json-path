@@ -96,7 +96,7 @@ while ( my $expression = shift @EXPRESSIONS ) {
 
     subtest $expression => sub {
         my @refs;
-        lives_ok { @refs = JSON::Path::Evaluator::evaluate( $obj, $expression, want_ref => 1 ) } q{evaluate() did not die};
+        lives_ok { @refs = JSON::Path::Evaluator::evaluate_jsonpath( $obj, $expression, want_ref => 1 ) } q{evaluate() did not die};
         $test->( \@refs, $obj );
     };
 }

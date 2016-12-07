@@ -77,7 +77,7 @@ sub to_string {
     return $_[0]->{expression};
 }
 
-sub evaluate {
+sub evaluate_jsonpath {
     my ( $json_object, $expression, %args ) = @_;
 
     my $want_ref = $args{want_ref} || 0;
