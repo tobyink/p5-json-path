@@ -636,6 +636,12 @@ This module is pretty much a straight line-by-line port of the PHP
 JSONPath implementation (version 0.8.x) by Stefan Goessner.
 See L<http://code.google.com/p/jsonpath/>.
 
+=head1 CONTRIBUTORS
+
+Kit Peters E<lt>popefelix@cpan.orgE<gt>
+
+Heiko Jansen E<lt>hjansen@cpan.orgE<gt>.
+
 =head1 COPYRIGHT AND LICENCE
 
 Copyright 2007 Stefan Goessner.
