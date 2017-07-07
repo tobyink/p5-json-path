@@ -101,7 +101,13 @@ JSONPath is described at [http://goessner.net/articles/JsonPath/](http://goessne
 - `set($object, $value, $limit)`
 
     Alters `$object`, setting the paths to `$value`. If set, then
-    `$limit` limits the number of changes made.
+    `$limit` limits the number of changes made. 
+
+    TAKE NOTE! This will create keys in $object. E.G.:
+
+        my $obj = { foo => 'bar' };
+        my $path = JSON::Path->new('$.baz');
+        $path->set($obj, 'bak'); # $obj->{baz} is created and set to 'bak'
 
     Returns the number of changes made.
 
