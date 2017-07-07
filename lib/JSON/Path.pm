@@ -470,7 +470,13 @@ the first result.
 =item C<<  set($object, $value, $limit)  >>
 
 Alters C<< $object >>, setting the paths to C<< $value >>. If set, then
-C<< $limit >> limits the number of changes made.
+C<< $limit >> limits the number of changes made. 
+
+TAKE NOTE! This will create keys in $object. E.G.:
+
+    my $obj = { foo => 'bar' };
+    my $path = JSON::Path->new('$.baz');
+    $path->set($obj, 'bak'); # $obj->{baz} is created and set to 'bak'
 
 Returns the number of changes made.
 
