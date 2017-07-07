@@ -21,9 +21,8 @@ use Sys::Hostname qw/hostname/;
 use Try::Tiny;
 
 # VERSION
-
+use base q(Exporter);
 our $AUTHORITY = 'cpan:POPEFELIX';
-our @ISA       = qw/ Exporter::Tiny /;
 our @EXPORT_OK = qw/ evaluate_jsonpath /;
 
 Readonly my $OPERATOR_IS_TRUE         => 'IS_TRUE';

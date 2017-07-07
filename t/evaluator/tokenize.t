@@ -15,6 +15,7 @@ my %EXPRESSIONS = (
         [ '$', '[', q('store'), ']', '[', q('book'), ']', '[', 0, ']', '[', q('author'), ']' ],
     q{$.[*].user[?(@.login == 'laurilehmijoki')]} =>
         [ qw/$ . [ * ] . user [?( @ ./, 'login ', '==', q{ 'laurilehmijoki'}, ')]' ],
+    q{$.path\.one.two} => [qw/$ . path.one . two/],
 );
 
 for my $expression ( keys %EXPRESSIONS ) {
