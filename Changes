@@ -1,3 +1,4 @@
 {{$NEXT}}
 
+- Added support for escaping reserved characters in paths
 - Initial revision. Forked from Toby Inkster's JSON::Path 0.205
