@@ -173,14 +173,13 @@ of that matched portion.
 sub evaluate { 
     my ($self, $expression, %args) = @_;
 
-    my $want_ref = delete $args{want_ref} || 0;
     my $json_object = $self->{root};
 
-    return $self->_evaluate( $json_object, [ tokenize($expression) ], $want_ref );
+    return $self->_evaluate( $json_object, [ tokenize($expression) ], $args{want_ref} );
 }
 
 sub _evaluate {    # This assumes that the token stream is syntactically valid
-    my ( $self, $obj, $token_stream, $want_ref ) = @_;
+    my ( $self, $obj, $token_stream, $want_ref) = @_;
 
     $token_stream ||= [];
 
@@ -248,8 +247,6 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                     return $want_ref ? @{$got} : map { ${$_} } @{$got};
                 }
                 else {
-                    return if $want_ref && !${$got};    # KLUDGE
-
                     return $want_ref ? $got : ${$got};
                 }
             }

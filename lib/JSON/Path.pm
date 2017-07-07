@@ -6,6 +6,8 @@ package JSON::Path;
 
 # VERSION
 
+use Exporter::Tiny ();
+our @ISA       = qw/ Exporter::Tiny /;
 our $AUTHORITY = 'cpan:POPEFELIX';
 our $Safe      = 1;
 
@@ -15,7 +17,6 @@ use JSON::Path::Evaluator;
 use Scalar::Util qw[blessed];
 use LV ();
 
-use base q{Exporter};
 our @EXPORT_OK = qw/ jpath jpath1 jpath_map /;
 
 use overload '""' => \&to_string;

@@ -7,11 +7,11 @@ my @EXPRESSIONS = (
     '$..book[-1:]'                                  => single_ref( sub { $_[0]->{store}{book}[-1] } ),
     '$.nonexistent' => sub {
         my ( $refs, $obj ) = @_;
-        is scalar @{$refs}, 0, 'Nonexistent path gives nothing back';
+        ok exists $obj->{nonexistent}, 'want_ref creates the key';
     },
     '$..nonexistent' => sub {
         my ( $refs, $obj ) = @_;
-        is scalar @{$refs}, 0, 'Nonexistent path gives nothing back';
+        is scalar @{$refs}, 0, 'Nonexistent recursive path gives nothing back';
     },
     '$.complex_array[?(@.type.code=="CODE_ALPHA")]' => single_ref( sub { $_[0]->{complex_array}[0] } ) ,
     '$.array[-1:]' => single_ref( sub { $_[0]->{array}[-1] } ),

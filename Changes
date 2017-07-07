@@ -6,5 +6,6 @@
       Max Laager++
       <https://rt.cpan.org/Ticket/Display.html?id=92237>
 
-    [ Misc ]
+    [ Other ]
+    - Setting values on non-existent keys will create the key with the value
     - Forked from Toby Inkster's JSON::Path 0.205
