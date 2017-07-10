@@ -138,8 +138,8 @@ BEGIN {
     use strict qw(vars refs);
     no warnings;
 
-    our $AUTHORITY = 'cpan:TOBYINK';
-    our $VERSION   = '0.205';
+    our $AUTHORITY = 'cpan:POPEFELIX';
+    # VERSION
 
     use Carp;
     use Scalar::Util qw[blessed];

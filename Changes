@@ -1,4 +1,7 @@
 {{$NEXT}}
+    
+    [ Bug Fixes ] 
+    - Fix missing version information in main module
 
 0.300     2017-07-10 11:13:48-05:00 America/Chicago
 
