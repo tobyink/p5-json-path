@@ -88,6 +88,12 @@ JSONPath is described at [http://goessner.net/articles/JsonPath/](http://goessne
         my $path = JSON::Path->new('$.name');
         $path->value($person) = "Bob";
 
+    TAKE NOTE! This will create keys in $object. E.G.:
+
+        my $obj = { foo => 'bar' };
+        my $path = JSON::Path->new('$.baz');
+        $path->value($obj) = 'bak'; # $obj->{baz} is created and set to 'bak';
+
 - `paths($object)`
 
     As per `values` but instead of returning structures which match the
@@ -211,9 +217,9 @@ in at least three other programming languages.
 
 Toby Inkster <tobyink@cpan.org>.
 
-This module is pretty much a straight line-by-line port of the PHP
-JSONPath implementation (version 0.8.x) by Stefan Goessner.
-See [http://code.google.com/p/jsonpath/](http://code.google.com/p/jsonpath/).
+# MAINTAINER
+
+Kit Peters <popefelix@cpan.org>
 
 # CONTRIBUTORS
 
