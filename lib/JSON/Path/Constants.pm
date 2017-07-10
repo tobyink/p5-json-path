@@ -3,6 +3,11 @@ use warnings;
 use 5.008;
 
 package JSON::Path::Constants;
+
+# ABSTRACT: Constants used in the JSON::Path distribution
+
+# VERSION
+
 use Readonly;
 
 use Exporter::Easy (
