@@ -340,7 +340,7 @@ BEGIN {
         my $res = eval $expr;
 
         if ($@) {
-            croak("eval failed: `$expr`, died");
+            croak(qq{eval failed: `$expr`, died with "$@"});
         }
 
         return $res;
