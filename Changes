@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+0.300     2017-07-10 11:13:48-05:00 America/Chicago
+
     [ Bug Fixes ]
     - Add support for escaping reserved characters
       Fixes RT #92237
