@@ -139,7 +139,7 @@ BEGIN {
     no warnings;
 
     our $AUTHORITY = 'cpan:TOBYINK';
-    our $VERSION   = '0.205';
+    # VERSION
 
     use Carp;
     use Scalar::Util qw[blessed];
