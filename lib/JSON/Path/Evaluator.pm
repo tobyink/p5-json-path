@@ -6,7 +6,6 @@ use 5.008;
 
 # ABSTRACT: A module that recursively evaluates JSONPath expressions with native support for Javascript-style filters
 
-
 use Carp;
 use Carp::Assert qw(assert);
 use Exporter::Tiny ();
@@ -137,7 +136,7 @@ sub evaluate_jsonpath {
             croak qq{Unable to decode $json_object as JSON: $_};
         }
     }
-    
+
     my $want_ref = delete $args{want_ref} || 0;
     my $self = __PACKAGE__->new(
         root             => $json_object,
@@ -145,7 +144,7 @@ sub evaluate_jsonpath {
         _calling_context => wantarray ? 'ARRAY' : 'SCALAR',
         %args
     );
-    return $self->evaluate($expression, want_ref => $want_ref);
+    return $self->evaluate( $expression, want_ref => $want_ref );
 }
 
 =method evaluate 
@@ -170,13 +169,12 @@ of that matched portion.
 
 =cut
 
-sub evaluate { 
-    my ($self, $expression, %args) = @_;
+sub evaluate {
+    my ( $self, $expression, %args ) = @_;
 
-    my $want_ref = delete $args{want_ref} || 0;
     my $json_object = $self->{root};
 
-    return $self->_evaluate( $json_object, [ tokenize($expression) ], $want_ref );
+    return $self->_evaluate( $json_object, [ tokenize($expression) ], $args{want_ref} );
 }
 
 sub _evaluate {    # This assumes that the token stream is syntactically valid
@@ -248,8 +246,6 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                     return $want_ref ? @{$got} : map { ${$_} } @{$got};
                 }
                 else {
-                    return if $want_ref && !${$got};    # KLUDGE
-
                     return $want_ref ? $got : ${$got};
                 }
             }

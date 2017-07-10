@@ -85,4 +85,7 @@ is( $jpath->set( $object => 'Anon' ), 1, );
 
 is( $jpath->value($object), 'Anon', );
 
+$jpath = JSON::Path->new('$.store.book.0.publisher');
+is( $jpath->set( $object, 'Peculiar Publications' ), 1 );
+is( $jpath->value( $object ), 'Peculiar Publications' );
 done_testing;

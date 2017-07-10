@@ -1,4 +1,11 @@
 {{$NEXT}}
 
-- Added support for escaping reserved characters in paths
-- Initial revision. Forked from Toby Inkster's JSON::Path 0.205
+    [ Bug Fixes ]
+    - Add support for escaping reserved characters
+      Fixes RT #92237
+      Max Laager++
+      <https://rt.cpan.org/Ticket/Display.html?id=92237>
+
+    [ Other ]
+    - Setting values on non-existent keys will create the key with the value
+    - Forked from Toby Inkster's JSON::Path 0.205
