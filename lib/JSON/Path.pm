@@ -138,7 +138,7 @@ BEGIN {
     use strict qw(vars refs);
     no warnings;
 
-    our $AUTHORITY = 'cpan:TOBYINK';
+    our $AUTHORITY = 'cpan:POPEFELIX';
     # VERSION
 
     use Carp;
