@@ -457,6 +457,12 @@ sub, which means you can assign to it:
   my $path = JSON::Path->new('$.name');
   $path->value($person) = "Bob";
 
+TAKE NOTE! This will create keys in $object. E.G.:
+
+    my $obj = { foo => 'bar' };
+    my $path = JSON::Path->new('$.baz');
+    $path->value($obj) = 'bak'; # $obj->{baz} is created and set to 'bak';
+
 =item C<<  paths($object)  >>
 
 As per C<values> but instead of returning structures which match the
@@ -593,9 +599,9 @@ in at least three other programming languages.
 
 Toby Inkster E<lt>tobyink@cpan.orgE<gt>.
 
-This module is pretty much a straight line-by-line port of the PHP
-JSONPath implementation (version 0.8.x) by Stefan Goessner.
-See L<http://code.google.com/p/jsonpath/>.
+=head1 MAINTAINER
+
+Kit Peters E<lt>popefelix@cpan.orgE<gt>
 
 =head1 CONTRIBUTORS
 
