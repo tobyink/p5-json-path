@@ -479,7 +479,7 @@ sub _process_perl {
 
     my $code = join '', @{$token_stream};
     my $cpt = Safe->new;
-    $cpt->permit_only( ':base_core', qw/padsv padav padhv padany/ );
+    $cpt->permit_only( ':base_core', qw/padsv padav padhv padany rv2gv/ );
     ${ $cpt->varglob('root') } = dclone( $self->{root} );
 
     my @matching;

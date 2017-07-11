@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+    [ Bug Fixes ]
+    - Fixes RT #122427
+    Slaven Rezic++
+
 0.301     2017-07-10 16:37:15-05:00 America/Chicago
     
     [ Bug Fixes ] 
