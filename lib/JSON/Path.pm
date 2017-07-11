@@ -189,10 +189,10 @@ BEGIN {
     }
 
     sub store {
-        my ( $self, $p, $v ) = @_;
-        push @{ $self->{'result'} }, ( $self->{'resultType'} eq "PATH" ? $self->asPath($p) : $v )
-            if $p;
-        return !!$p;
+        my ( $self, $path, $value ) = @_;
+        push @{ $self->{'result'} }, ( $self->{'resultType'} eq "PATH" ? $self->asPath($path) : $value )
+            if $path;
+        return !!$path;
     }
 
     sub trace {
@@ -202,11 +202,12 @@ BEGIN {
 
         #return $self->store($path, $val) unless $expr;
 
-        my ( $loc, $x );
+        # Gets the first element from a JSONPath expression
+        my ( $loc, $element );
         {
-            my @x = split /\;/, $expr;
-            $loc = shift @x;
-            $x = join ';', @x;
+            my @bits = split /\;/, $expr;
+            $loc = shift @bits;
+            $element = join ';', @bits;
         }
 
         # in Perl need to distinguish between arrays and hashes.
@@ -214,37 +215,37 @@ BEGIN {
             and $loc =~ /^\-?[0-9]+$/
             and exists $val->[$loc] )
         {
-            $self->trace( $x, $val->[$loc], sprintf( '%s;%s', $path, $loc ) );
+            $self->trace( $element, $val->[$loc], sprintf( '%s;%s', $path, $loc ) );
         }
         elsif ( isObject($val)
             and exists $val->{$loc} )
         {
-            $self->trace( $x, $val->{$loc}, sprintf( '%s;%s', $path, $loc ) );
+            $self->trace( $element, $val->{$loc}, sprintf( '%s;%s', $path, $loc ) );
         }
         elsif ( $loc eq '*' ) {
-            $self->walk( $loc, $x, $val, $path, \&_callback_03 );
+            $self->walk( $loc, $element, $val, $path, \&_callback_03 );
         }
         elsif ( $loc eq '..' ) {
-            $self->trace( $x, $val, $path );
-            $self->walk( $loc, $x, $val, $path, \&_callback_04 );
+            $self->trace( $element, $val, $path );
+            $self->walk( $loc, $element, $val, $path, \&_descend_recursive );
         }
         elsif ( $loc =~ /\,/ )    # [name1,name2,...]
         {
-            $self->trace( $_ . ';' . $x, $val, $path ) foreach split /\,/, $loc;
+            $self->trace( $_ . ';' . $element, $val, $path ) foreach split /\,/, $loc;
         }
         elsif ( $loc =~ /^\(.*?\)$/ )    # [(expr)]
         {
             my $evalx = $self->evalx( $loc, $val, substr( $path, rindex( $path, ";" ) + 1 ) );
-            $self->trace( $evalx . ';' . $x, $val, $path );
+            $self->trace( $evalx . ';' . $element, $val, $path );
         }
         elsif ( $loc =~ /^\?\(.*?\)$/ )    # [?(expr)]
         {
             # my $evalx = $self->evalx($loc, $val, substr($path, rindex($path,";")+1));
-            $self->walk( $loc, $x, $val, $path, \&_callback_05 );
+            $self->walk( $loc, $element, $val, $path, \&_evaluate_filter_expression );
         }
         elsif ( $loc =~ /^(-?[0-9]*):(-?[0-9]*):?(-?[0-9]*)$/ )    # [start:end:step]  python slice syntax
         {
-            $self->slice( $loc, $x, $val, $path );
+            $self->slice( $loc, $element, $val, $path );
         }
     }
 
@@ -253,38 +254,55 @@ BEGIN {
         $self->trace( $m . ";" . $x, $v, $p );
     }
 
-    sub _callback_04 {
-        my ( $self, $m, $l, $x, $v, $p ) = @_;
+    sub _descend_recursive {
+        my ( $self, $index, $l, $x, $object, $p ) = @_;
 
-        if (    isArray($v)
-            and isArray( $v->[$m] ) || isObject( $v->[$m] ) )
+        if (    isArray($object)
+            and isArray( $object->[$index] ) || isObject( $object->[$index] ) )
         {
-            $self->trace( "..;" . $x, $v->[$m], $p . ";" . $m );
+            $self->trace( "..;" . $x, $object->[$index], $p . ";" . $index );
         }
-        elsif ( isObject($v)
-            and isArray( $v->{$m} ) || isObject( $v->{$m} ) )
+        elsif ( isObject($object)
+            and isArray( $object->{$index} ) || isObject( $object->{$index} ) )
         {
-            $self->trace( "..;" . $x, $v->{$m}, $p . ";" . $m );
+            $self->trace( "..;" . $x, $object->{$index}, $p . ";" . $index );
         }
     }
 
-    sub _callback_05 {
-        my ( $self, $m, $l, $x, $v, $p ) = @_;
+    # Handles [?( $expr )] expressions
+    sub _evaluate_filter_expression {
+        my ( $self, $index, $filter_expression, $x, $object, $p ) = @_;
 
-        $l =~ s/^\?\((.*?)\)$/$1/g;
+        $filter_expression =~ s/^\?\((.*?)\)$/$1/g;
 
         my $evalx;
-        if ( isArray($v) ) {
-            $evalx = $self->evalx( $l, $v->[$m] );
+        if ( isArray($object) ) {
+            $evalx = $self->evalx( $filter_expression, $object->[$index] );
         }
-        elsif ( isObject($v) ) {
-            $evalx = $self->evalx( $l, $v->{$m} );
+        elsif ( isObject($object) ) {
+            $evalx = $self->evalx( $filter_expression, $object->{$index} );
         }
 
-        $self->trace( $m . ";" . $x, $v, $p )
+        $self->trace( $index . ";" . $x, $object, $p )
             if $evalx;
     }
 
+    # Evaluate $f (a coderef) for each index in an arrayref or hashref. Returns a list where each
+    # element is '' or 1 depending on if the corresponding index in $val matches the expression or not.
+    # So for a hash, 
+    #   {   foo => { name => 'Email', }, 
+    #       bar => { name => 'Something' },
+    #   }
+    #
+    # The expression   
+    #
+    # $f will be passed;
+    # * $self - JSON::Path::Helper instance
+    # * $_    - Index
+    # * $loc  - Expression to evaluate for each element
+    # * $expr - JSONPath expression
+    # * $val  - Object (arrayref or hashref) to evaluate the expression against
+    # * $path - The path to start from
     sub walk {
         my ( $self, $loc, $expr, $val, $path, $f ) = @_;
 
