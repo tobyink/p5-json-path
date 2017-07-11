@@ -1,4 +1,6 @@
 {{$NEXT}}
+
+0.301     2017-07-10 16:37:15-05:00 America/Chicago
     
     [ Bug Fixes ] 
     - Fix missing version information in main module
