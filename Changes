@@ -1,0 +1,22 @@
+{{$NEXT}}
+
+    [ Bug Fixes ]
+    - Fixes RT #122427
+    Slaven Rezic++
+
+0.301     2017-07-10 16:37:15-05:00 America/Chicago
+    
+    [ Bug Fixes ] 
+    - Fix missing version information in main module
+
+0.300     2017-07-10 11:13:48-05:00 America/Chicago
+
+    [ Bug Fixes ]
+    - Add support for escaping reserved characters
+      Fixes RT #92237
+      Max Laager++
+      <https://rt.cpan.org/Ticket/Display.html?id=92237>
+
+    [ Other ]
+    - Setting values on non-existent keys will create the key with the value
+    - Forked from Toby Inkster's JSON::Path 0.205
