@@ -7,9 +7,9 @@ use 5.008;
 use Carp;
 use Readonly;
 use JSON::Path::Constants qw(:symbols);
-use Exporter::Easy ( OK => [ 'tokenize' ] );
+use Exporter::Easy ( OK => ['tokenize'] );
 
-Readonly my $ESCAPE_CHAR => qq{\\};
+Readonly my $ESCAPE_CHAR      => qq{\\};
 Readonly my %RESERVED_SYMBOLS => (
     $DOLLAR_SIGN          => 1,
     $COMMERCIAL_AT        => 1,
@@ -40,11 +40,11 @@ sub tokenize {
     while ( defined( my $char = shift @chars ) ) {
         my $token = $char;
 
-        if ($char eq $ESCAPE_CHAR) { 
+        if ( $char eq $ESCAPE_CHAR ) {
             my $next_char = shift @chars;
             $token .= $next_char;
         }
-        elsif ( $RESERVED_SYMBOLS{$char}) {
+        elsif ( $RESERVED_SYMBOLS{$char} ) {
             if ( $char eq $FULL_STOP ) {    # distinguish between the '.' and '..' tokens
                 my $next_char = shift @chars;
                 if ( $next_char eq $FULL_STOP ) {
@@ -122,7 +122,7 @@ sub tokenize {
         else {
             # Read from the character stream until we have a valid token
             while ( defined( $char = shift @chars ) ) {
-                if ( $char eq $ESCAPE_CHAR ) { 
+                if ( $char eq $ESCAPE_CHAR ) {
                     $char = shift @chars;
                 }
                 elsif ( $RESERVED_SYMBOLS{$char} ) {
