@@ -12,6 +12,8 @@ subtest filter => sub {
     my @expressions = (
         '$.complex_array[?(@.weight > 10)]' =>
             [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
+        '$.complex_array[?($_->{weight} > 10)]' =>
+            [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
         '$.complex_array[?(@.type.code=="CODE_ALPHA")]' =>
             [ dclone( ( grep { $_->{type}{code} eq 'CODE_ALPHA' } @{ $data{complex_array} } )[0] ) ],
         '$.complex_array[?(@.weight > 10)].classification.quux' =>

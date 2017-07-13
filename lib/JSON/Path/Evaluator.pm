@@ -6,16 +6,16 @@ use 5.008;
 
 # ABSTRACT: A module that recursively evaluates JSONPath expressions with native support for Javascript-style filters
 
-
 use Carp;
 use Carp::Assert qw(assert);
 use Exporter::Tiny ();
 use JSON::MaybeXS;
 use JSON::Path::Constants qw(:operators);
 use JSON::Path::Tokenizer qw(tokenize);
+use List::Util qw/pairs/;
 use Readonly;
 use Safe;
-use Scalar::Util qw/looks_like_number blessed/;
+use Scalar::Util qw/looks_like_number blessed refaddr/;
 use Storable qw/dclone/;
 use Sys::Hostname qw/hostname/;
 use Try::Tiny;
@@ -54,7 +54,7 @@ Readonly my %OPERATORS                => (
 
 Readonly my $ASSERT_ENABLE => $ENV{ASSERT_ENABLE};
 
-=method new 
+=method new
 
 Constructor for the object-oriented interface to this module. Arguments may be specified in a hash or a hashref.
 
@@ -70,15 +70,15 @@ Required. JSONPath expressions will be evaluated with respect to this. Must be a
 
 JSONPath expression to evaluate
 
-= want_ref 
+= want_ref
 
 Set this to true if you want a reference to the thing the JSONPath expression matches, rather than the value
 of said thing. Useful if you want to use this to modify hashrefs / arrayrefs in place.
 
 = script_engine
 
-Defaults to "PseudoJS", which is my clever name for a subset of Javascript-B<like> operators for Boolean expressions. 
-See L</"Filtering with PseudoJS">. You may also specify "perl" here, in which case the filter will be treated as Perl code. 
+Defaults to "PseudoJS", which is my clever name for a subset of Javascript-B<like> operators for Boolean expressions.
+See L</"Filtering with PseudoJS">. You may also specify "perl" here, in which case the filter will be treated as Perl code.
 See L</"Filtering with Perl">.
 
 =end :list
@@ -100,7 +100,7 @@ sub new {
     return $self;
 }
 
-=method evaluate_jsonpath 
+=method evaluate_jsonpath
 
 Evaluate a JSONPath expression on the given object. CLASS METHOD.
 
@@ -111,16 +111,16 @@ Args:
 = $json_object
 
 JSON object for which the expression will be evaluated. If this is a scalar, it will be treated
-as a JSON string and parsed into the appropriate Perl data structure first. 
+as a JSON string and parsed into the appropriate Perl data structure first.
 
-= $expression 
+= $expression
 
 JSONPath expression to evaluate on the object.
 
-= %args 
+= %args
 
 Misc. arguments to this method. Currently the only supported argument is 'want_ref' - set this to
-true in order to return a reference to the matched portion of the object, rather than the value 
+true in order to return a reference to the matched portion of the object, rather than the value
 of that matched portion.
 
 =end :list
@@ -138,18 +138,22 @@ sub evaluate_jsonpath {
             croak qq{Unable to decode $json_object as JSON: $_};
         }
     }
-    
-    my $want_ref = delete $args{want_ref} || 0;
+
+    my $want_ref  = delete $args{want_ref}  || 0;
+    my $want_path = delete $args{want_path} || 0;
+
+    my $script_engine = delete $args{script_engine} ? $args{script_engine} : $expression =~ /\$_/ ? 'perl' : undef;
     my $self = __PACKAGE__->new(
         root             => $json_object,
         expression       => $expression,
+        script_engine    => $script_engine,
         _calling_context => wantarray ? 'ARRAY' : 'SCALAR',
         %args
     );
-    return $self->evaluate($expression, want_ref => $want_ref);
+    return $self->evaluate( $expression, want_ref => $want_ref, want_path => $want_path );
 }
 
-=method evaluate 
+=method evaluate
 
 Evaluate a JSONPath expression on the object passed to the constructor.  OBJECT METHOD.
 
@@ -157,27 +161,85 @@ Args:
 
 =begin :list
 
-= $expression 
+= $expression
 
 JSONPath expression to evaluate on the object.
 
-= %args 
+= %args
 
-Misc. arguments to this method. Currently the only supported argument is 'want_ref' - set this to
-true in order to return a reference to the matched portion of the object, rather than the value 
-of that matched portion.
+Misc. arguments to this method.
+
+Supported keys:
+
+=begin :list
+
+= want_ref
+
+Set this to true in order to return a reference to the matched portion of the object, rather than
+the value of the matched portion.
+
+= want_path
+
+Set this to true in order to return the canonical path(s) to the elements matching the expression.
+
+=end :list
 
 =end :list
 
 =cut
 
-sub evaluate { 
-    my ($self, $expression, %args) = @_;
+sub evaluate {
+    my ( $self, $expression, %args ) = @_;
 
     my $want_ref = delete $args{want_ref} || 0;
     my $json_object = $self->{root};
 
-    return $self->_evaluate( $json_object, [ tokenize($expression) ], $want_ref );
+    my $token_stream = [ tokenize($expression) ];
+    if ( $args{want_path} ) {
+        my %reftable = $self->_reftable_walker($json_object);
+        my @refs = $self->_evaluate( $json_object, $token_stream, 1 );
+
+        my @paths;
+        for my $ref (@refs) {
+            my $refaddr = refaddr $ref or next;
+            push @paths, $reftable{$refaddr};
+        }
+        return @paths;
+    }
+    return $self->_evaluate( $json_object, $token_stream, $want_ref );
+}
+
+sub _reftable_walker {
+    my ( $self, $json_object, $base_path ) = @_;
+
+    $base_path   ||= '$';
+    $json_object ||= $self->root;
+
+    my @entries = ( $base_path => refaddr $json_object );
+
+    if ( ref $json_object eq 'ARRAY' ) {
+        for ( 0 .. $#{$json_object} ) {
+            my $path = sprintf '%s[%d]', $base_path, $_;
+            if ( ref $json_object->[$_] ) {
+                push @entries, $self->_reftable_walker( $json_object->[$_], $path );
+            }
+            else {
+                push @entries, refaddr \( $json_object->[$_] ) => $path;
+            }
+        }
+    }
+    else {
+        for my $index ( keys %{$json_object} ) {
+            my $path = sprintf '%s.%s', $base_path, $index;
+            if ( ref $json_object->{$index} ) {
+                push @entries, $self->_reftable_walker( $json_object->{$index}, $path );
+            }
+            else {
+                push @entries, refaddr \( $json_object->{$index} ) => $path;
+            }
+        }
+    }
+    return @entries;
 }
 
 sub _evaluate {    # This assumes that the token stream is syntactically valid
@@ -531,14 +593,14 @@ sub _compare {
 1;
 __END__
 
-=head1 SYNOPSIS 
+=head1 SYNOPSIS
 
     use JSON::MaybeXS qw/decode_json/; # Or whatever JSON thing you like. I won't judge.
     use JSON::Path::Evaluator qw/evaluate_jsonpath/;
 
     my $obj = decode_json(q(
         { "store": {
-            "book": [ 
+            "book": [
               { "category": "reference",
                 "author": "Nigel Rees",
                 "title": "Sayings of the Century",
@@ -591,17 +653,17 @@ __END__
     #     }
     # );
 
-=head1 JSONPath 
+=head1 JSONPath
 
-This code implements the JSONPath specification at L<JSONPath specification|http://goessner.net/articles/JsonPath/>. 
+This code implements the JSONPath specification at L<JSONPath specification|http://goessner.net/articles/JsonPath/>.
 
 JSONPath is a tool, similar to XPath for XML, that allows one to construct queries to pick out parts of a JSON structure.
 
 =head2 JSONPath Expressions
 
-From the spec: "JSONPath expressions always refer to a JSON structure in the same way as XPath 
-expression are used in combination with an XML document. Since a JSON structure is usually anonymous 
-and doesn't necessarily have a "root member object" JSONPath assumes the abstract name $ assigned 
+From the spec: "JSONPath expressions always refer to a JSON structure in the same way as XPath
+expression are used in combination with an XML document. Since a JSON structure is usually anonymous
+and doesn't necessarily have a "root member object" JSONPath assumes the abstract name $ assigned
 to the outer level object."
 
 Note that in JSONPath square brackets operate on the object or array addressed by the previous path fragment. Indices always start by 0.
@@ -610,77 +672,77 @@ Note that in JSONPath square brackets operate on the object or array addressed b
 
 =begin :list
 
-= $                   
+= $
 
 the root object/element
 
-= @                   
+= @
 
 the current object/element
 
-= . or []             
+= . or []
 
 child operator
 
-= ..                  
+= ..
 
 recursive descent. JSONPath borrows this syntax from E4X.
 
-= *                   
+= *
 
 wildcard. All objects/elements regardless their names.
 
-= []                  
+= []
 
 subscript operator. XPath uses it to iterate over element collections and for predicates. In Javascript and JSON it is the native array operator.
 
-= [,]                 
+= [,]
 
 Union operator in XPath results in a combination of node sets. JSONPath allows alternate names or array indices as a set.
 
-= [start:end:step]    
+= [start:end:step]
 
 array slice operator borrowed from ES4.
 
-= ?()                 
+= ?()
 
 applies a filter (script) expression. See L<Filtering>.
 
-= ()                  
+= ()
 
 script expression, using the underlying script engine. Handled the same as "?()".
 
-=end :list 
+=end :list
 
 =head2 Filtering
 
-Filters are the most powerful feature of JSONPath. They allow the caller to retrieve data 
+Filters are the most powerful feature of JSONPath. They allow the caller to retrieve data
 conditionally, similar to Perl's C<grep> operator.
 
 Filters are specified using the '?(' token, terminated by ')'. Anything in between these
 two tokens is treated as a filter expression. Filter expressions must return a boolean value.
 
-=head3 Filtering with PseudoJS 
+=head3 Filtering with PseudoJS
 
 By default, this module uses a limited subset of Javascript expressions to evaluate filters. Using
 this script engine, specify the filter in the form "<LHS> <operator> <RHS>", or "<LHS>". This latter
 case will be evaluated as "<LHS> is true".
 
-<LHS> must be a valid JSONPath expression. <RHS> must be a scalar value; comparison of two JSONPath 
-expressions is not supported at this time. 
+<LHS> must be a valid JSONPath expression. <RHS> must be a scalar value; comparison of two JSONPath
+expressions is not supported at this time.
 
 Example:
 
 Using the JSON in L<SYNOPSIS> above and the JSONPath expression C<$..book[?(@.category == "fiction")]>,
-the filter expression C<@.category == "fiction"> will match all values having a value of "fiction" for 
+the filter expression C<@.category == "fiction"> will match all values having a value of "fiction" for
 the key "category".
 
 =head2 Filtering with Perl
 
-When the script engine is set to "perl", filter 
+When the script engine is set to "perl", filter
 Using the JSON in L<SYNOPSIS> above and the JSONPath expression C<$..book[?(@.category == "fiction")]>,
 
-This is understandably dangerous. Although steps have been taken (Perl expressions are evaluated using 
+This is understandably dangerous. Although steps have been taken (Perl expressions are evaluated using
 L<Safe> and a limited set of permitted opcodes) to reduce the risk, callers should be aware of the risk
 when using filters.
 
@@ -688,13 +750,13 @@ When filtering in Perl, there are some differences between the JSONPath spec and
 
 =begin :list
 
-* JSONPath uses the token '$' to refer to the root node. As this is not valid Perl, this should be 
+* JSONPath uses the token '$' to refer to the root node. As this is not valid Perl, this should be
 replaced with '$root' in a filter expression.
 
-* JSONPath uses the token '@' to refer to the current node. This is also not valid Perl. Use '$_' 
+* JSONPath uses the token '@' to refer to the current node. This is also not valid Perl. Use '$_'
 instead.
 
-=end :list 
+=end :list
 
 =cut
 
