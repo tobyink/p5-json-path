@@ -1,7 +1,7 @@
-use Test2::V0 '-target' => 'JSON::Path::Evaluator';
-
-plan skip_all => 'this will fail';
-
+use Test2::V0 '-target' => 'JSON::Path';
+plan skip_all => 'This will fail';
+use JSON::Parse 'parse_json';
+local $JSON::Path::Safe = 0;
 my $json='{
    "4" : {
       "value_raw" : "European",
@@ -42,9 +42,10 @@ my $json='{
       "id" : 5
    }
 }';
+my $json_hash = parse_json($json);
 my $p3 = $CLASS->new( '$.[?($_->{name} eq "Email")]');
 my @paths;
-ok lives { @paths = $p3->paths($json) }, q{paths() did not die} or diag qq{Caught exception: $@};
+ok lives { @paths = $p3->paths($json_hash) }, q{paths() did not die} or diag qq{Caught exception: $@};
 is \@paths, [ '$.5' ], q{paths() produced correct path};
 
 done_testing;

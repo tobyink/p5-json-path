@@ -201,7 +201,7 @@ sub evaluate {
 
         my @paths;
         for my $ref (@refs) {
-            my $refaddr = refaddr $ref or next;
+            my $refaddr = ref ${$ref} ? refaddr ${$ref} : refaddr $ref;
             push @paths, $reftable{$refaddr};
         }
         return @paths;
@@ -215,7 +215,7 @@ sub _reftable_walker {
     $base_path   ||= '$';
     $json_object ||= $self->root;
 
-    my @entries = ( $base_path => refaddr $json_object );
+    my @entries = ( refaddr $json_object => $base_path );
 
     if ( ref $json_object eq 'ARRAY' ) {
         for ( 0 .. $#{$json_object} ) {

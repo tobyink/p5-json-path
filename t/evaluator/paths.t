@@ -10,6 +10,7 @@ my %data = %{ decode_json($json) };
 
 subtest filter => sub {
     my @expressions = (
+#        '$..[?(@.price > 10)]'       => [ grep { $_->{price} > 10 } @{ $data{store}{book} } ],
         '$.complex_array[?(@.weight > 10)]' =>
             [ map { dclone $_ } grep { $_->{weight} > 10 } @{ $data{complex_array} } ],
         '$.complex_array[?($_->{weight} > 10)]' =>
