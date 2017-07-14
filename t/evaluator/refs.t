@@ -4,55 +4,16 @@ use JSON::Path::Evaluator;
 use JSON::MaybeXS qw/decode_json/;
 
 my @EXPRESSIONS = (
+    '$.complex_array[?(@.type.code=="CODE_ALPHA")]' => single_ref( sub { $_[0]->{complex_array}[0] } ),
     '$..book[-1:]'                                  => single_ref( sub { $_[0]->{store}{book}[-1] } ),
-    '$.nonexistent' => sub {
-        my ( $refs, $obj ) = @_;
-        ok exists $obj->{nonexistent}, 'want_ref creates the key';
-    },
-    '$..nonexistent' => sub {
-        my ( $refs, $obj ) = @_;
-        is scalar @{$refs}, 0, 'Nonexistent recursive path gives nothing back';
-    },
-    '$.complex_array[?(@.type.code=="CODE_ALPHA")]' => single_ref( sub { $_[0]->{complex_array}[0] } ) ,
-    '$.array[-1:]' => single_ref( sub { $_[0]->{array}[-1] } ),
-    '$.array[0,1]' => sub {
-        my ( $refs, $obj ) = @_;
-        for ( 0 .. $#{$refs} ) {
-            my $ref      = $refs->[$_];
-            my $expected = int rand 1000;
-            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
-            ${$ref} = $expected;
-            is $obj->{array}[$_], $expected, qq{Value $_ OK};
-        }
-    },
-    '$.array[1:3]' => sub {
-        my ( $refs, $obj ) = @_;
-        for ( 0 .. $#{$refs} ) {
-            my $ref      = $refs->[$_];
-            my $expected = int rand 1000;
-            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
-            ${$ref} = $expected;
-            is $obj->{array}[ $_ + 1 ], $expected, qq{Value $_ OK};
-        }
-    },
+    '$.array[-1:]'                                  => single_ref( sub { $_[0]->{array}[-1] } ),
     '$.simple'                                      => single_ref( sub { $_[0]->{simple} } ),
     '$.long_hash.key1.subkey2'                      => single_ref( sub { $_[0]->{long_hash}{key1}{subkey2} } ),
     '$.multilevel_array.1.0.0'                      => single_ref( sub { $_[0]->{multilevel_array}[1][0][0] } ),
     '$.store.book[0].title'                         => single_ref( sub { $_[0]->{store}{book}[0]{title} } ),
     '$.array[0]'                                    => single_ref( sub { $_[0]->{array}[0] } ),
     '$.long_hash.key1'                              => single_ref( sub { $_[0]->{long_hash}{key1} } ),
-    '$.complex_array[?(@.quux)]' => sub {
-        my ( $refs, $obj ) = @_;
-
-        my @indices = grep { $obj->{complex_array}[$_]{quux} } (0 .. $#{ $obj->{complex_array} });
-        for ( 0 .. $#{$refs} ) {
-            my $ref = $refs->[$_];
-            my $expected = int rand 1000;
-            ${$ref} = $expected;
-            is $obj->{complex_array}[$indices[$_]], $expected, q{Value OK};
-        }
-    },
-    '$..foo' => sub {
+    '$..foo'                                        => sub {
         my ( $refs, $obj ) = @_;
         for ( 0 .. $#{$refs} ) {
             my $ref      = $refs->[$_];
@@ -87,6 +48,45 @@ my @EXPRESSIONS = (
             }
         }
     },
+    '$.complex_array[?(@.quux)]' => sub {
+        my ( $refs, $obj ) = @_;
+
+        my @indices = grep { $obj->{complex_array}[$_]{quux} } ( 0 .. $#{ $obj->{complex_array} } );
+        for ( 0 .. $#{$refs} ) {
+            my $ref      = $refs->[$_];
+            my $expected = int rand 1000;
+            ${$ref} = $expected;
+            is $obj->{complex_array}[ $indices[$_] ], $expected, q{Value OK};
+        }
+    },
+    '$.nonexistent' => sub {
+        my ( $refs, $obj ) = @_;
+        ok exists $obj->{nonexistent}, 'want_ref creates the key';
+    },
+    '$..nonexistent' => sub {
+        my ( $refs, $obj ) = @_;
+        is scalar @{$refs}, 0, 'Nonexistent recursive path gives nothing back';
+    },
+    '$.array[0,1]' => sub {
+        my ( $refs, $obj ) = @_;
+        for ( 0 .. $#{$refs} ) {
+            my $ref      = $refs->[$_];
+            my $expected = int rand 1000;
+            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
+            ${$ref} = $expected;
+            is $obj->{array}[$_], $expected, qq{Value $_ OK};
+        }
+    },
+    '$.array[1:3]' => sub {
+        my ( $refs, $obj ) = @_;
+        for ( 0 .. $#{$refs} ) {
+            my $ref      = $refs->[$_];
+            my $expected = int rand 1000;
+            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
+            ${$ref} = $expected;
+            is $obj->{array}[ $_ + 1 ], $expected, qq{Value $_ OK};
+        }
+    },
 );
 
 while ( my $expression = shift @EXPRESSIONS ) {
@@ -96,7 +96,8 @@ while ( my $expression = shift @EXPRESSIONS ) {
 
     subtest $expression => sub {
         my @refs;
-        lives_ok { @refs = JSON::Path::Evaluator::evaluate_jsonpath( $obj, $expression, want_ref => 1 ) } q{evaluate() did not die};
+        lives_ok { @refs = JSON::Path::Evaluator::evaluate_jsonpath( $obj, $expression, want_ref => 1 ) }
+        q{evaluate() did not die};
         $test->( \@refs, $obj );
     };
 }
