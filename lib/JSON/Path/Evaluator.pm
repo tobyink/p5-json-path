@@ -179,7 +179,8 @@ sub evaluate {
     shift @{$token_stream} if $token_stream->[0] eq $TOKEN_ROOT;
     shift @{$token_stream} if $token_stream->[0] eq $TOKEN_CHILD;
 
-    return $self->_evaluate( $json_object, $token_stream, $args{want_ref} );
+    my @ret = $self->_evaluate( $json_object, $token_stream, $args{want_ref} );
+    return wantarray ? @ret : $ret[0];
 }
 
 sub _evaluate {    # This assumes that the token stream is syntactically valid
@@ -535,11 +536,10 @@ sub _normalize {
 }
 
 sub _process_perl {
-    my ( $self, $object, $token_stream ) = @_;
+    my ( $self, $object, $code) = @_;
 
     assert( _arraylike($object), q{Object is an arrayref} ) if $ASSERT_ENABLE;
 
-    my $code = join '', @{$token_stream};
     my $cpt = Safe->new;
     $cpt->permit_only( ':base_core', qw/padsv padav padhv padany rv2gv/ );
     ${ $cpt->varglob('root') } = dclone( $self->{root} );
