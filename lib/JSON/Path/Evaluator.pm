@@ -197,12 +197,11 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             my @matching_indices = $self->_process_filter( $obj, $token_stream );
 
             if ( !@{$token_stream} ) {
-                return map { _get( $obj, $_ ) } @matching_indices;
+                my @got = map { _get( $obj, $_ ) } @matching_indices;
+                return $want_ref ? @got : map { ${$_} } @got;
             }
             else {
-                return
-                    map { $self->_evaluate( _get( $obj, $_ ), dclone($token_stream), $want_ref ) }
-                    @matching_indices;
+                return map { $self->_evaluate( _get( $obj, $_ ), dclone($token_stream), $want_ref ) } @matching_indices;
             }
         }
         elsif ( $token eq $TOKEN_RECURSIVE )
@@ -227,24 +226,14 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             }
 
             assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
-            assert( ref $index eq 'HASH', q{Index is a hashref} ) if $ASSERT_ENABLE && ref $index;
+            assert( !ref $index,         q{Index is a scalar} )            if $ASSERT_ENABLE;
 
-            my ($got) = _get( $obj, $index );
+            my (@got) = _get( $obj, $index );    # This always returns a ref
             if ( !@{$token_stream} ) {
-                if ( ref $got eq 'ARRAY' ) {
-                    return $want_ref ? @{$got} : map { ${$_} } @{$got};
-                }
-                else {
-                    return $want_ref ? $got : ${$got};
-                }
+                return $want_ref ? @got : map { ${$_} } @got;
             }
             else {
-                if ( ref $got eq 'ARRAY' ) {
-                    return map { $self->_evaluate( ${$_}, dclone($token_stream), $want_ref ) } @{$got};
-                }
-                else {
-                    return $self->_evaluate( ${$got}, dclone($token_stream), $want_ref );
-                }
+                return map { $self->_evaluate( ${$_}, dclone($token_stream), $want_ref ) } @got;
             }
         }
     }
@@ -442,9 +431,10 @@ sub _process_pseudo_js {
 
     my ( $lhs, $operator, $rhs ) = _parse_psuedojs_expression($expression);
 
-    my ( @token_stream ) = tokenize($lhs);
+    my (@token_stream) = tokenize($lhs);
 
     my $index;
+
     # FIXME: I really need to return a normalized token stream from tokenize
     # if ( $token_stream[-1] eq $TOKEN_SUBSCRIPT_CLOSE ) {
     #     pop @token_stream;
@@ -457,16 +447,17 @@ sub _process_pseudo_js {
     # }
 
     my @lhs;
-    if (_hashlike($object)) {
-        @lhs = map { $self->_evaluate( $_, [ @token_stream ] ) } values %{$object};
+    if ( _hashlike($object) ) {
+        @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
     }
     else {
-        @lhs = map { $self->_evaluate( $_, [ @token_stream ] ) } @{$object};
+        @lhs = map { $self->_evaluate( $_, [@token_stream] ) } @{$object};
     }
 
     # get indexes that pass compare()
     my @matching;
     for ( 0 .. $#lhs ) {
+
         #    my $val = _get( $lhs[$_], $index );
         my $val = $lhs[$_];
         push @matching, $_ if _compare( $operator, $val, $rhs );
@@ -481,7 +472,7 @@ sub _parse_psuedojs_expression {
 
     my ( $lhs, $operator, $rhs );
 
-    # The operator could be '=', '==', '===', '<=', or '>='
+    # The operator could be '=', '!=', '==', '===', '<=', or '>='
     if ( $expression =~ /$EQUAL_SIGN/ ) {
         my $position = index( $expression, '=' );
         if ( substr( $expression, $position + 1, 1 ) eq $EQUAL_SIGN ) {    # could be '==' or '==='
@@ -500,6 +491,9 @@ sub _parse_psuedojs_expression {
             elsif ( $preceding_char eq $LESS_THAN_SIGN ) {
                 $operator = $TOKEN_LESS_EQUAL;
             }
+            elsif ( $preceding_char eq $EXCLAMATION_MARK ) {
+                $operator = $TOKEN_NOT_EQUAL;
+            }
             else {
                 $operator = $TOKEN_SINGLE_EQUAL;
             }
@@ -509,7 +503,8 @@ sub _parse_psuedojs_expression {
     else {
         for ( grep { $OPERATORS{$_} eq $OPERATOR_TYPE_COMPARISON } keys %OPERATORS ) {
             next if /$EQUAL_SIGN/;
-            if ( ( $lhs, $rhs ) = split /$_/, $expression, 2 ) {
+            if ( $expression =~ /$_/ ) {
+                ( $lhs, $rhs ) = split /$_/, $expression, 2;
                 $operator = $_;
                 last;
             }
@@ -518,7 +513,8 @@ sub _parse_psuedojs_expression {
 
     # FIXME: RHS is assumed to be a single value. This isn't necessarily a safe assumption.
     if ($operator) {
-        $rhs = _normalize($rhs || '');
+        $rhs = _normalize( $rhs || '' );
+        $lhs = _normalize( $lhs );
     }
     else {
         $operator = $OPERATOR_IS_TRUE;
