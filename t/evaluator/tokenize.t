@@ -1,7 +1,8 @@
-use Test::Most;
+use Test2::V0;
 use JSON::Path::Tokenizer qw(tokenize);
 
 my @EXPRESSIONS = (
+    q{$[1:3:2].foobar}                       => [qw/$ [ 1:3:2 ] . foobar/],
     q{$.[0].title}                           => [qw/$ . [ 0 ] . title/],
     q{$.store.book[?(@.price < 10)].title}   => [ qw/$ . store . book [?(/, '@.price < 10', qw/)] . title/ ],
     '$.[*].id'                               => [qw/$ . [ * ] . id/],
@@ -24,10 +25,11 @@ my @EXPRESSIONS = (
 for ( 0 .. ( $#EXPRESSIONS / 2 ) ) {
     my $expression = $EXPRESSIONS[ $_ * 2 ];
     my $expected   = $EXPRESSIONS[ $_ * 2 + 1 ];
-    lives_and {
-        is_deeply( [ tokenize($expression) ], $expected )
-    }
-    qq{Expression "$expression" tokenized correctly};
+    my $tokens;
+    subtest $expression => sub {
+        ok lives { $tokens = [ tokenize($expression) ] }, q{tokenize() did not die};
+        is $tokens, $expected, q{Token stream correct};
+    };
 }
 
 done_testing;
