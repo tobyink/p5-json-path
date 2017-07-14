@@ -10,7 +10,7 @@ use Carp;
 use Carp::Assert qw(assert);
 use Exporter::Tiny ();
 use JSON::MaybeXS;
-use JSON::Path::Constants qw(:operators);
+use JSON::Path::Constants qw(:operators :symbols);
 use JSON::Path::Tokenizer qw(tokenize);
 use Readonly;
 use Safe;
@@ -177,8 +177,9 @@ sub evaluate {
     my $token_stream = [ tokenize($expression) ];
 
     shift @{$token_stream} if $token_stream->[0] eq $TOKEN_ROOT;
+    shift @{$token_stream} if $token_stream->[0] eq $TOKEN_CHILD;
 
-    return $self->_evaluate( $json_object, [ tokenize($expression) ], $args{want_ref} );
+    return $self->_evaluate( $json_object, $token_stream, $args{want_ref} );
 }
 
 sub _evaluate {    # This assumes that the token stream is syntactically valid
@@ -187,39 +188,49 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
     $token_stream ||= [];
 
     while ( defined( my $token = shift @{$token_stream} ) ) {
-        next                                       if $token eq $TOKEN_CURRENT;
-        next                                       if $token eq $TOKEN_CHILD;
+        next if $token eq $TOKEN_CURRENT;
+        next if $token eq $TOKEN_CHILD;
 
         if ( $token eq $TOKEN_FILTER_OPEN ) {
+
             # Find all indices matching the filter expression. This modifies $token_stream
             my @matching_indices = $self->_process_filter( $obj, $token_stream );
 
             if ( !@{$token_stream} ) {
-                return map { $self->_get( $obj, $_, $want_ref ) } @matching_indices;
+                return map { _get( $obj, $_ ) } @matching_indices;
             }
             else {
                 return
-                    map { $self->_evaluate( $self->_get( $obj, $_ ), dclone($token_stream), $want_ref ) }
+                    map { $self->_evaluate( _get( $obj, $_ ), dclone($token_stream), $want_ref ) }
                     @matching_indices;
             }
         }
-        elsif ( $token eq $TOKEN_RECURSIVE ) { # Sweet Jesus, Pooh, that's not honey! You're eating Sweet Jesus, Pooh, that's not honey! You're eating...
+        elsif ( $token eq $TOKEN_RECURSIVE )
+        {    # Sweet Jesus, Pooh, that's not honey! You're eating Sweet Jesus, Pooh, that's not honey! You're eating...
             my $index = shift @{$token_stream};
 
             my $matched = [ _match_recursive( $obj, $index, $want_ref ) ];
-            if ( !scalar @{$token_stream} ) {
+            if ( !@{$token_stream} ) {
                 return @{$matched};
             }
             return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$matched};
         }
         else {
-            my $index = shift @{$token_stream};
+            my $index;
+            if ( $token eq $TOKEN_SUBSCRIPT_OPEN ) {
+                $index = shift @{$token_stream};
+                my $closing_token = shift @{$token_stream};
+                assert $closing_token eq $TOKEN_SUBSCRIPT_CLOSE if $ASSERT_ENABLE;
+            }
+            else {
+                $index = $token;
+            }
 
             assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
             assert( ref $index eq 'HASH', q{Index is a hashref} ) if $ASSERT_ENABLE && ref $index;
 
+            my ($got) = _get( $obj, $index );
             if ( !@{$token_stream} ) {
-                my $got = _get( $obj, $index );
                 if ( ref $got eq 'ARRAY' ) {
                     return $want_ref ? @{$got} : map { ${$_} } @{$got};
                 }
@@ -228,7 +239,6 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
                 }
             }
             else {
-                my $got = _get( $obj, $index );
                 if ( ref $got eq 'ARRAY' ) {
                     return map { $self->_evaluate( ${$_}, dclone($token_stream), $want_ref ) } @{$got};
                 }
@@ -241,11 +251,11 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 }
 
 sub _process_filter {
-    my ( $self, $token_stream, $obj ) = @_;
+    my ( $self, $obj, $token_stream ) = @_;
     my $filter_expression = shift @{$token_stream};
 
     my $closing_token = shift @{$token_stream};
-    assert($closing_token eq $TOKEN_FILTER_SCRIPT_CLOSE, q{Closing token seen}) if $ASSERT_ENABLE;
+    assert( $closing_token eq $TOKEN_FILTER_SCRIPT_CLOSE, q{Closing token seen} ) if $ASSERT_ENABLE;
     my @matching_indices;
     if ( $self->{script_engine} eq 'PseudoJS' ) {
         @matching_indices = $self->_process_pseudo_js( $obj, $filter_expression );
@@ -259,23 +269,31 @@ sub _process_filter {
     return @matching_indices;
 }
 
+# This _always_ has to return a ref so that when it's called from evaluate( ... , want_ref => 1)
+# So that we can return a ref into the object (e.g. for use as an lvalue), even when the path points
+# to a scalar (which will of course be copied).
+#
+# I.E.: for { foo => 'bar' }, we always want \( foo->{bar} ) so that
+# JSON::Path->new('$.foo')->value($obj) = 'baz' works  like it oughtta.
 sub _get {
-    my ( $object, $index, $want_ref ) = @_;
+    my ( $object, $index ) = @_;
 
     assert( _hashlike($object) || _arraylike($object), 'Object is a hashref or an arrayref' ) if $ASSERT_ENABLE;
 
+    # When want_ref is passed to _evaluate(), it will return a reference to whatever was matched.
+    # If what was matched is itself a ref (e.g. an arrayref), _evaluate() will return a ref of
+    # type 'REF'.
     if ( ref $object eq 'REF' ) {
-        warn qq{Ref kludge for index "$index"};
         $object = ${$object};
     }
 
     my @ret;
     if ( $index eq $TOKEN_ALL ) {
         if ( _hashlike($object) ) {
-            return $want_ref ? map { \($_) } values %{$object} : values %{$object};
+            return map { \($_) } values %{$object};
         }
         else {
-            return $want_ref ? map { \($_) } @{$object} : @{$object};
+            return map { \($_) } @{$object};
         }
     }
     else {
@@ -292,11 +310,11 @@ sub _get {
         }
 
         if ( _hashlike($object) ) {
-            return $want_ref ? map { \( $object->{$_} ) } @indices : map { $object->{$_} } @indices;
+            return map { \( $object->{$_} ) } @indices;
         }
         else {
             no warnings qw/numeric/;
-            return $want_ref ? map { \( $object->[$_] ) } @indices : map { $object->[$_] } @indices;
+            return map { \( $object->[$_] ) } @indices;
             use warnings qw/numeric/;
         }
     }
@@ -372,9 +390,17 @@ sub _get_token {
 sub _slice {
     my ( $index, $length ) = @_;
 
-    my $start = substr( $index, 0, 1 ) // 0;
-    my $end   = substr( $index, 2, 1 ) // -1;
-    my $step  = substr( $index, 4, 1 ) // 1;
+    my ( $start, $end, $step ) = split /$TOKEN_ARRAY_SLICE/, $index, 3;
+
+    if ( !defined($start) || $start eq '' ) {
+        $start = 0;
+    }
+    if ( !defined($end) || $end eq '' ) {
+        $end = -1;
+    }
+    if ( !defined($step) || $step eq '' ) {
+        $step = 1;
+    }
 
     $start = ( $length - 1 ) if $start == -1;
     $end   = $length         if $end == -1;
@@ -412,35 +438,104 @@ sub _match_recursive {
 }
 
 sub _process_pseudo_js {
-    my ( $self, $object, $token_stream ) = @_;
+    my ( $self, $object, $expression ) = @_;
 
-    # Treat as @.foo IS TRUE
-    my $rhs      = pop @{$token_stream};
-    my $operator = pop @{$token_stream};
+    my ( $lhs, $operator, $rhs ) = _parse_psuedojs_expression($expression);
 
-    # This assumes that RHS is only a single token. I think that's a safe assumption.
-    if ( $OPERATORS{$operator} eq $OPERATOR_TYPE_COMPARISON ) {
-        $rhs = normalize($rhs);
+    my ( @token_stream ) = tokenize($lhs);
+
+    my $index;
+    # FIXME: I really need to return a normalized token stream from tokenize
+    # if ( $token_stream[-1] eq $TOKEN_SUBSCRIPT_CLOSE ) {
+    #     pop @token_stream;
+    #     $index = pop @token_stream;
+    #     my $opening_token = pop @token_stream;
+    #     assert $opening_token eq $TOKEN_SUBSCRIPT_OPEN if $ASSERT_ENABLE;
+    # }
+    # else {
+    #     $index = pop @token_stream;
+    # }
+
+    my @lhs;
+    if (_hashlike($object)) {
+        @lhs = map { $self->_evaluate( $_, [ @token_stream ] ) } values %{$object};
     }
     else {
-        push @{$token_stream}, $operator, $rhs;
-        $operator = $OPERATOR_IS_TRUE;
+        @lhs = map { $self->_evaluate( $_, [ @token_stream ] ) } @{$object};
     }
-
-    my $index     = normalize( pop @{$token_stream} );
-    my $separator = pop @{$token_stream};
-
-    # Evaluate the left hand side of the comparison first. .
-    my @lhs = $self->_evaluate( $object, dclone $token_stream );
 
     # get indexes that pass compare()
     my @matching;
     for ( 0 .. $#lhs ) {
-        my $val = ${ _get( $lhs[$_], $index ) };
+        #    my $val = _get( $lhs[$_], $index );
+        my $val = $lhs[$_];
         push @matching, $_ if _compare( $operator, $val, $rhs );
     }
 
     return @matching;
+}
+
+sub _parse_psuedojs_expression {
+    my $expression = shift;
+    my @parts;
+
+    my ( $lhs, $operator, $rhs );
+
+    # The operator could be '=', '==', '===', '<=', or '>='
+    if ( $expression =~ /$EQUAL_SIGN/ ) {
+        my $position = index( $expression, '=' );
+        if ( substr( $expression, $position + 1, 1 ) eq $EQUAL_SIGN ) {    # could be '==' or '==='
+            if ( substr( $expression, $position + 2, 1 ) eq $EQUAL_SIGN ) {    # ===
+                $operator = $TOKEN_TRIPLE_EQUAL;
+            }
+            else {
+                $operator = $TOKEN_DOUBLE_EQUAL;
+            }
+        }
+        else {
+            my $preceding_char = substr( $expression, $position - 1, 1 );
+            if ( $preceding_char eq $GREATER_THAN_SIGN ) {
+                $operator = $TOKEN_GREATER_EQUAL;
+            }
+            elsif ( $preceding_char eq $LESS_THAN_SIGN ) {
+                $operator = $TOKEN_LESS_EQUAL;
+            }
+            else {
+                $operator = $TOKEN_SINGLE_EQUAL;
+            }
+        }
+        ( $lhs, $rhs ) = split /$operator/, $expression, 2;
+    }
+    else {
+        for ( grep { $OPERATORS{$_} eq $OPERATOR_TYPE_COMPARISON } keys %OPERATORS ) {
+            next if /$EQUAL_SIGN/;
+            if ( ( $lhs, $rhs ) = split /$_/, $expression, 2 ) {
+                $operator = $_;
+                last;
+            }
+        }
+    }
+
+    # FIXME: RHS is assumed to be a single value. This isn't necessarily a safe assumption.
+    if ($operator) {
+        $rhs = _normalize($rhs || '');
+    }
+    else {
+        $operator = $OPERATOR_IS_TRUE;
+        $lhs      = $expression;
+    }
+    return ( $lhs, $operator, $rhs );
+}
+
+sub _normalize {
+    my $string = shift;
+
+    # NB: Stripping spaces *before* stripping quotes allows the caller to quote spaces in an index.
+    # So an index of 'foo ' will be correctly normalized as 'foo', but '"foo "' will normalize to 'foo '.
+    $string =~ s/\s+$//;                # trim trailing spaces
+    $string =~ s/^\s+//;                # trim leading spaces
+    $string =~ s/^['"](.+)['"]$/$1/;    # Strip quotes from index
+    return $string;
 }
 
 sub _process_perl {
