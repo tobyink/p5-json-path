@@ -3,15 +3,21 @@ use warnings;
 use 5.008;
 
 package JSON::Path::Constants;
+
+# ABSTRACT: Constants used in the JSON::Path distribution
+
+# VERSION
+
 use Readonly;
 
 use Exporter::Easy (
     TAGS => [
         symbols => [
-            '$DOLLAR_SIGN',          '$COMMERCIAL_AT',     '$FULL_STOP',     '$LEFT_SQUARE_BRACKET',
-            '$RIGHT_SQUARE_BRACKET', '$ASTERISK',          '$COLON',         '$LEFT_PARENTHESIS',
-            '$RIGHT_PARENTHESIS',    '$COMMA',             '$QUESTION_MARK', '$EQUAL_SIGN',
-            '$EXCLAMATION_MARK',     '$GREATER_THAN_SIGN', '$LESS_THAN_SIGN',
+            '$DOLLAR_SIGN',          '$COMMERCIAL_AT',     '$FULL_STOP',      '$LEFT_SQUARE_BRACKET',
+            '$RIGHT_SQUARE_BRACKET', '$ASTERISK',          '$COLON',          '$LEFT_PARENTHESIS',
+            '$RIGHT_PARENTHESIS',    '$COMMA',             '$QUESTION_MARK',  '$EQUAL_SIGN',
+            '$EXCLAMATION_MARK',     '$GREATER_THAN_SIGN', '$LESS_THAN_SIGN', '$QUOTATION_MARK',
+            '$APOSTROPHE'
         ],
         operators => [
             '$TOKEN_ROOT',           '$TOKEN_CURRENT',
@@ -28,6 +34,8 @@ use Exporter::Easy (
     ]
 );
 
+Readonly our $QUOTATION_MARK       => q{"};
+Readonly our $APOSTROPHE           => q{'};
 Readonly our $DOLLAR_SIGN          => '$';
 Readonly our $COMMERCIAL_AT        => '@';
 Readonly our $FULL_STOP            => '.';

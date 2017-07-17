@@ -10,7 +10,7 @@ use Carp;
 use Carp::Assert qw(assert);
 use Exporter::Tiny ();
 use JSON::MaybeXS;
-use JSON::Path::Constants qw(:operators);
+use JSON::Path::Constants qw(:operators :symbols);
 use JSON::Path::Tokenizer qw(tokenize);
 use List::Util qw/pairs/;
 use Readonly;
@@ -21,9 +21,8 @@ use Sys::Hostname qw/hostname/;
 use Try::Tiny;
 
 # VERSION
-
+use base q(Exporter);
 our $AUTHORITY = 'cpan:POPEFELIX';
-our @ISA       = qw/ Exporter::Tiny /;
 our @EXPORT_OK = qw/ evaluate_jsonpath /;
 
 Readonly my $OPERATOR_IS_TRUE         => 'IS_TRUE';
@@ -191,10 +190,10 @@ Set this to true in order to return the canonical path(s) to the elements matchi
 sub evaluate {
     my ( $self, $expression, %args ) = @_;
 
-    my $want_ref = delete $args{want_ref} || 0;
     my $json_object = $self->{root};
 
     my $token_stream = [ tokenize($expression) ];
+
     if ( $args{want_path} ) {
         my %reftable = $self->_reftable_walker($json_object);
         my @refs = $self->_evaluate( $json_object, $token_stream, 1 );
@@ -206,7 +205,11 @@ sub evaluate {
         }
         return @paths;
     }
-    return $self->_evaluate( $json_object, $token_stream, $want_ref );
+    shift @{$token_stream} if $token_stream->[0] eq $TOKEN_ROOT;
+    shift @{$token_stream} if $token_stream->[0] eq $TOKEN_CHILD;
+
+    my @ret = $self->_evaluate( $json_object, $token_stream, $args{want_ref} );
+    return wantarray ? @ret : $ret[0];
 }
 
 sub _reftable_walker {
@@ -247,140 +250,143 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
     $token_stream ||= [];
 
-    while ( defined( my $token = _get_token($token_stream) ) ) {
-        next                                       if $token eq $TOKEN_CURRENT;
-        next                                       if $token eq $TOKEN_CHILD;
-        assert( $token ne $TOKEN_SUBSCRIPT_OPEN )  if $ASSERT_ENABLE;
-        assert( $token ne $TOKEN_SUBSCRIPT_CLOSE ) if $ASSERT_ENABLE;
+    while ( defined( my $token = shift @{$token_stream} ) ) {
+        next if $token eq $TOKEN_CURRENT;
+        next if $token eq $TOKEN_CHILD;
 
-        if ( $token eq $TOKEN_ROOT ) {
-            return $self->_evaluate( $self->{root}, $token_stream, $want_ref );
-        }
-        elsif ( $token eq $TOKEN_FILTER_OPEN ) {
-            confess q{Filters not supported on hashrefs} if _hashlike($obj);
+        if ( $token eq $TOKEN_FILTER_OPEN ) {
 
-            my @sub_stream;
-
-            # Build a stream of just the tokens between the filter open and close
-            while ( defined( my $token = _get_token($token_stream) ) ) {
-                last if $token eq $TOKEN_FILTER_SCRIPT_CLOSE;
-                if ( $token eq $TOKEN_CURRENT ) {
-                    push @sub_stream, $token, $TOKEN_CHILD, $TOKEN_ALL;
-                }
-                else {
-                    push @sub_stream, $token;
-                }
-            }
-
-            my @matching_indices;
-            if ( $self->{script_engine} eq 'PseudoJS' ) {
-                @matching_indices = $self->_process_pseudo_js( $obj, [@sub_stream] );
-            }
-            elsif ( $self->{script_engine} eq 'perl' ) {
-                @matching_indices = $self->_process_perl( $obj, [@sub_stream] );
-            }
-            else {
-                croak qq{Unsupported script engine "$self->{script_engine}"};
-            }
+            # Find all indices matching the filter expression. This modifies $token_stream
+            my @matching_indices = $self->_process_filter( $obj, $token_stream );
 
             if ( !@{$token_stream} ) {
-                return $want_ref ? map { \( $obj->[$_] ) } @matching_indices : map { $obj->[$_] } @matching_indices;
+                my @got = map { _get( $obj, $_ ) } @matching_indices;
+                return $want_ref ? @got : map { ${$_} } @got;
             }
-
-            # Evaluate the token stream on all elements that pass the comparison in compare()
-            return map { $self->_evaluate( $obj->[$_], dclone($token_stream), $want_ref ) } @matching_indices;
+            else {
+                return map { $self->_evaluate( _get( $obj, $_ ), dclone($token_stream), $want_ref ) } @matching_indices;
+            }
         }
-        elsif ( $token eq $TOKEN_RECURSIVE ) {
-            my $index = _get_token($token_stream);
+        elsif ( $token eq $TOKEN_RECURSIVE )
+        {    # Sweet Jesus, Pooh, that's not honey! You're eating Sweet Jesus, Pooh, that's not honey! You're eating...
+            my $index = shift @{$token_stream};
 
             my $matched = [ _match_recursive( $obj, $index, $want_ref ) ];
-            if ( !scalar @{$token_stream} ) {
+            if ( !@{$token_stream} ) {
                 return @{$matched};
             }
             return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$matched};
         }
         else {
-            my $index = normalize($token);
-
-            assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
-            assert( ref $index eq 'HASH', q{Index is a hashref} ) if $ASSERT_ENABLE && ref $index;
-
-            if ( !@{$token_stream} ) {
-                my $got = _get( $obj, $index );
-                if ( ref $got eq 'ARRAY' ) {
-                    return $want_ref ? @{$got} : map { ${$_} } @{$got};
-                }
-                else {
-                    return if $want_ref && !${$got};    # KLUDGE
-
-                    return $want_ref ? $got : ${$got};
-                }
+            my $index;
+            if ( $token eq $TOKEN_SUBSCRIPT_OPEN ) {
+                $index = shift @{$token_stream};
+                my $closing_token = shift @{$token_stream};
+                assert $closing_token eq $TOKEN_SUBSCRIPT_CLOSE if $ASSERT_ENABLE;
             }
             else {
-                my $got = _get( $obj, $index );
-                if ( ref $got eq 'ARRAY' ) {
-                    return map { $self->_evaluate( ${$_}, dclone($token_stream), $want_ref ) } @{$got};
-                }
-                else {
-                    return $self->_evaluate( ${$got}, dclone($token_stream), $want_ref );
-                }
+                $index = $token;
+            }
+
+            assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
+            assert( !ref $index,         q{Index is a scalar} )            if $ASSERT_ENABLE;
+
+            my (@got) = _get( $obj, $index, create_key => $want_ref );    # This always returns a ref
+            if ( !@{$token_stream} ) {
+                return $want_ref ? @got : map { ${$_} } @got;
+            }
+            else {
+                return map { $self->_evaluate( ${$_}, dclone($token_stream), $want_ref ) } @got;
             }
         }
     }
 }
 
-sub _get {
-    my ( $object, $index ) = @_;
+sub _process_filter {
+    my ( $self, $obj, $token_stream ) = @_;
+    my $filter_expression = shift @{$token_stream};
 
-    $object = ${$object} if ref $object eq 'REF';    # KLUDGE
+    my $closing_token = shift @{$token_stream};
+    assert( $closing_token eq $TOKEN_FILTER_SCRIPT_CLOSE, q{Closing token seen} ) if $ASSERT_ENABLE;
+    my @matching_indices;
+    if ( $self->{script_engine} eq 'PseudoJS' ) {
+        @matching_indices = $self->_process_pseudo_js( $obj, $filter_expression );
+    }
+    elsif ( $self->{script_engine} eq 'perl' ) {
+        @matching_indices = $self->_process_perl( $obj, $filter_expression );
+    }
+    else {
+        croak qq{Unsupported script engine "$self->{script_engine}"};
+    }
+    return @matching_indices;
+}
+
+# This _always_ has to return a ref so that when it's called from evaluate( ... , want_ref => 1)
+# So that we can return a ref into the object (e.g. for use as an lvalue), even when the path points
+# to a scalar (which will of course be copied).
+#
+# I.E.: for { foo => 'bar' }, we always want \( foo->{bar} ) so that
+# JSON::Path->new('$.foo')->value($obj) = 'baz' works  like it oughtta.
+sub _get {
+    my ( $object, $index, %args ) = @_;
 
     assert( _hashlike($object) || _arraylike($object), 'Object is a hashref or an arrayref' ) if $ASSERT_ENABLE;
 
-    my $scalar_context;
-    my @indices;
-    if ( $index eq $TOKEN_ALL ) {
-        @indices = keys( %{$object} )   if _hashlike($object);
-        @indices = ( 0 .. $#{$object} ) if _arraylike($object);
+    my $create_key = $args{create_key};
+
+    # When want_ref is passed to _evaluate(), it will return a reference to whatever was matched.
+    # If what was matched is itself a ref (e.g. an arrayref), _evaluate() will return a ref of
+    # type 'REF'.
+    if ( ref $object eq 'REF' ) {
+        $object = ${$object};
     }
-    elsif ( ref $index ) {
-        assert( ref $index eq 'HASH', q{Index supplied in a hashref} ) if $ASSERT_ENABLE;
-        if ( $index->{union} ) {
-            @indices = @{ $index->{union} };
+
+    if ( $index eq $TOKEN_ALL ) {
+        if ( _hashlike($object) ) {
+            return map { \($_) } values %{$object};
         }
-        elsif ( $index->{slice} ) {
-            confess qq(Slices not supported for hashlike objects) if _hashlike($object);
-            @indices = _slice( scalar @{$object}, $index->{slice} );
+        else {
+            return map { \($_) } @{$object};
         }
-        else { assert( 0, q{Handling a slice or a union} ) if $ASSERT_ENABLE }
     }
     else {
-        $scalar_context = 1;
-        @indices        = ($index);
-    }
-    @indices = grep { looks_like_number($_) } @indices if _arraylike($object);
+        my @indices;
+        if ( $index =~ /$TOKEN_ARRAY_SLICE/ ) {
+            my $length = _hashlike($object) ? scalar values %{$object} : scalar @{$object};
+            @indices = _slice( $index, $length );
+        }
+        elsif ( $index =~ /$TOKEN_UNION/ ) {
+            @indices = split /$TOKEN_UNION/, $index;
+        }
+        else {
+            @indices = ($index);
+        }
 
-    if ($scalar_context) {
-        return unless @indices;
-
-        my ($index) = @indices;
         if ( _hashlike($object) ) {
-            return \( $object->{$index} );
+            if ($create_key) {
+                return map { \( $object->{$_} ) } @indices;
+            }
+            else {
+                my @ret;
+                for my $index (@indices) {
+                    push @ret, \( $object->{$index} ) if exists $object->{$index};
+                }
+                return @ret;
+            }
         }
         else {
             no warnings qw/numeric/;
-            return \( $object->[$index] );
+            if ($create_key) {
+                return map { \( $object->[$_] ) } @indices;
+            }
+            else {
+                my @ret;
+                for my $index (@indices) {
+                    push @ret, \( $object->[$index] ) if exists $object->[$index];
+                }
+                return @ret;
+            }
             use warnings qw/numeric/;
-        }
-    }
-    else {
-        return [] unless @indices;
-
-        if ( _hashlike($object) ) {
-            return [ map { \( $object->{$_} ) } @indices ];
-        }
-        else {
-            my @ret;
-            return [ map { \( $object->[$_] ) } grep { looks_like_number($_) } @indices ];
         }
     }
 }
@@ -453,13 +459,19 @@ sub _get_token {
 # in particular, for the slice [n:m], m is *one greater* than the last index to slice.
 # This means that the slice [3:5] will return indices 3 and 4, but *not* 5.
 sub _slice {
-    my ( $length, $spec ) = @_;
-    my ( $start, $end, $step ) = @{$spec};
+    my ( $index, $length ) = @_;
 
-    # start, end, and step are set in get_token
-    assert( defined $start ) if $ASSERT_ENABLE;
-    assert( defined $end )   if $ASSERT_ENABLE;
-    assert( defined $step )  if $ASSERT_ENABLE;
+    my ( $start, $end, $step ) = split /$TOKEN_ARRAY_SLICE/, $index, 3;
+
+    if ( !defined($start) || $start eq '' ) {
+        $start = 0;
+    }
+    if ( !defined($end) || $end eq '' ) {
+        $end = -1;
+    }
+    if ( !defined($step) || $step eq '' ) {
+        $step = 1;
+    }
 
     $start = ( $length - 1 ) if $start == -1;
     $end   = $length         if $end == -1;
@@ -496,7 +508,104 @@ sub _match_recursive {
     return @match;
 }
 
-sub normalize {
+sub _process_pseudo_js {
+    my ( $self, $object, $expression ) = @_;
+
+    my ( $lhs, $operator, $rhs ) = _parse_psuedojs_expression($expression);
+
+    my (@token_stream) = tokenize($lhs);
+
+    my $index;
+
+    # FIXME: I really need to return a normalized token stream from tokenize
+    # if ( $token_stream[-1] eq $TOKEN_SUBSCRIPT_CLOSE ) {
+    #     pop @token_stream;
+    #     $index = pop @token_stream;
+    #     my $opening_token = pop @token_stream;
+    #     assert $opening_token eq $TOKEN_SUBSCRIPT_OPEN if $ASSERT_ENABLE;
+    # }
+    # else {
+    #     $index = pop @token_stream;
+    # }
+
+    my @lhs;
+    if ( _hashlike($object) ) {
+        @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
+    }
+    else {
+        @lhs = map { $self->_evaluate( $_, [@token_stream] ) } @{$object};
+    }
+
+    # get indexes that pass compare()
+    my @matching;
+    for ( 0 .. $#lhs ) {
+
+        #    my $val = _get( $lhs[$_], $index );
+        my $val = $lhs[$_];
+        push @matching, $_ if _compare( $operator, $val, $rhs );
+    }
+
+    return @matching;
+}
+
+sub _parse_psuedojs_expression {
+    my $expression = shift;
+    my @parts;
+
+    my ( $lhs, $operator, $rhs );
+
+    # The operator could be '=', '!=', '==', '===', '<=', or '>='
+    if ( $expression =~ /$EQUAL_SIGN/ ) {
+        my $position = index( $expression, '=' );
+        if ( substr( $expression, $position + 1, 1 ) eq $EQUAL_SIGN ) {    # could be '==' or '==='
+            if ( substr( $expression, $position + 2, 1 ) eq $EQUAL_SIGN ) {    # ===
+                $operator = $TOKEN_TRIPLE_EQUAL;
+            }
+            else {
+                $operator = $TOKEN_DOUBLE_EQUAL;
+            }
+        }
+        else {
+            my $preceding_char = substr( $expression, $position - 1, 1 );
+            if ( $preceding_char eq $GREATER_THAN_SIGN ) {
+                $operator = $TOKEN_GREATER_EQUAL;
+            }
+            elsif ( $preceding_char eq $LESS_THAN_SIGN ) {
+                $operator = $TOKEN_LESS_EQUAL;
+            }
+            elsif ( $preceding_char eq $EXCLAMATION_MARK ) {
+                $operator = $TOKEN_NOT_EQUAL;
+            }
+            else {
+                $operator = $TOKEN_SINGLE_EQUAL;
+            }
+        }
+        ( $lhs, $rhs ) = split /$operator/, $expression, 2;
+    }
+    else {
+        for ( grep { $OPERATORS{$_} eq $OPERATOR_TYPE_COMPARISON } keys %OPERATORS ) {
+            next if /$EQUAL_SIGN/;
+            if ( $expression =~ /$_/ ) {
+                ( $lhs, $rhs ) = split /$_/, $expression, 2;
+                $operator = $_;
+                last;
+            }
+        }
+    }
+
+    # FIXME: RHS is assumed to be a single value. This isn't necessarily a safe assumption.
+    if ($operator) {
+        $rhs = _normalize( $rhs || '' );
+        $lhs = _normalize($lhs);
+    }
+    else {
+        $operator = $OPERATOR_IS_TRUE;
+        $lhs      = $expression;
+    }
+    return ( $lhs, $operator, $rhs );
+}
+
+sub _normalize {
     my $string = shift;
 
     # NB: Stripping spaces *before* stripping quotes allows the caller to quote spaces in an index.
@@ -507,46 +616,13 @@ sub normalize {
     return $string;
 }
 
-sub _process_pseudo_js {
-    my ( $self, $object, $token_stream ) = @_;
-
-    # Treat as @.foo IS TRUE
-    my $rhs      = pop @{$token_stream};
-    my $operator = pop @{$token_stream};
-
-    # This assumes that RHS is only a single token. I think that's a safe assumption.
-    if ( $OPERATORS{$operator} eq $OPERATOR_TYPE_COMPARISON ) {
-        $rhs = normalize($rhs);
-    }
-    else {
-        push @{$token_stream}, $operator, $rhs;
-        $operator = $OPERATOR_IS_TRUE;
-    }
-
-    my $index     = normalize( pop @{$token_stream} );
-    my $separator = pop @{$token_stream};
-
-    # Evaluate the left hand side of the comparison first. .
-    my @lhs = $self->_evaluate( $object, dclone $token_stream );
-
-    # get indexes that pass compare()
-    my @matching;
-    for ( 0 .. $#lhs ) {
-        my $val = ${ _get( $lhs[$_], $index ) };
-        push @matching, $_ if _compare( $operator, $val, $rhs );
-    }
-
-    return @matching;
-}
-
 sub _process_perl {
-    my ( $self, $object, $token_stream ) = @_;
+    my ( $self, $object, $code ) = @_;
 
     assert( _arraylike($object), q{Object is an arrayref} ) if $ASSERT_ENABLE;
 
-    my $code = join '', @{$token_stream};
     my $cpt = Safe->new;
-    $cpt->permit_only( ':base_core', qw/padsv padav padhv padany/ );
+    $cpt->permit_only( ':base_core', qw/padsv padav padhv padany rv2gv/ );
     ${ $cpt->varglob('root') } = dclone( $self->{root} );
 
     my @matching;

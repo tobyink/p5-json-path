@@ -2,73 +2,18 @@ use Test::Most;
 use Carp;
 use JSON::Path::Evaluator;
 use JSON::MaybeXS qw/decode_json/;
-use Scalar::Util qw(refaddr);
 
 my @EXPRESSIONS = (
-    '$..book[-1:]'  => single_ref( sub { $_[0]->{store}{book}[-1] } ),
-    '$.nonexistent' => sub {
-        my ( $refs, $obj ) = @_;
-        is scalar @{$refs}, 0, 'Nonexistent path gives nothing back';
-    },
-    '$..nonexistent' => sub {
-        my ( $refs, $obj ) = @_;
-        is scalar @{$refs}, 0, 'Nonexistent path gives nothing back';
-    },
     '$.complex_array[?(@.type.code=="CODE_ALPHA")]' => single_ref( sub { $_[0]->{complex_array}[0] } ),
+    '$..book[-1:]'                                  => single_ref( sub { $_[0]->{store}{book}[-1] } ),
     '$.array[-1:]'                                  => single_ref( sub { $_[0]->{array}[-1] } ),
-    '$.array[0,1]'                                  => sub {
-        my ( $refs, $obj ) = @_;
-        for ( 0 .. $#{$refs} ) {
-            my $ref      = $refs->[$_];
-            my $expected = int rand 1000;
-            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
-            ${$ref} = $expected;
-            is $obj->{array}[$_], $expected, qq{Value $_ OK};
-        }
-    },
-    '$.array[1:3]' => sub {
-        my ( $refs, $obj ) = @_;
-        for ( 0 .. $#{$refs} ) {
-            my $ref      = $refs->[$_];
-            my $expected = int rand 1000;
-            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
-            ${$ref} = $expected;
-            is $obj->{array}[ $_ + 1 ], $expected, qq{Value $_ OK};
-        }
-    },
-    '$.complex_array[?($_->{weight} > 10)]' => sub {
-        my ( $refs, $obj ) = @_;
-        for ( 0 .. $#{$refs} ) {
-            my $ref = $refs->[$_];
-            is ref ${$ref}, 'HASH', qq{Reftype $_ OK};
-            my $expected = int rand 1000;
-            ${$ref}->{test_key} = $expected;
-            if ( $_ == 0 ) {
-                is $obj->{complex_array}[0]{test_key}, $expected, qq{Value $_ OK};
-            }
-            else {
-                is $obj->{complex_array}[2]{test_key}, $expected, qq{Value $_ OK};
-            }
-        }
-    },
-    '$.simple'                   => single_ref( sub { $_[0]->{simple} } ),
-    '$.long_hash.key1.subkey2'   => single_ref( sub { $_[0]->{long_hash}{key1}{subkey2} } ),
-    '$.multilevel_array.1.0.0'   => single_ref( sub { $_[0]->{multilevel_array}[1][0][0] } ),
-    '$.store.book[0].title'      => single_ref( sub { $_[0]->{store}{book}[0]{title} } ),
-    '$.array[0]'                 => single_ref( sub { $_[0]->{array}[0] } ),
-    '$.long_hash.key1'           => single_ref( sub { $_[0]->{long_hash}{key1} } ),
-    '$.complex_array[?(@.quux)]' => sub {
-        my ( $refs, $obj ) = @_;
-
-        my @indices = grep { $obj->{complex_array}[$_]{quux} } ( 0 .. $#{ $obj->{complex_array} } );
-        for ( 0 .. $#{$refs} ) {
-            my $ref      = $refs->[$_];
-            my $expected = int rand 1000;
-            ${$ref} = $expected;
-            is $obj->{complex_array}[ $indices[$_] ], $expected, q{Value OK};
-        }
-    },
-    '$..foo' => sub {
+    '$.simple'                                      => single_ref( sub { $_[0]->{simple} } ),
+    '$.long_hash.key1.subkey2'                      => single_ref( sub { $_[0]->{long_hash}{key1}{subkey2} } ),
+    '$.multilevel_array.1.0.0'                      => single_ref( sub { $_[0]->{multilevel_array}[1][0][0] } ),
+    '$.store.book[0].title'                         => single_ref( sub { $_[0]->{store}{book}[0]{title} } ),
+    '$.array[0]'                                    => single_ref( sub { $_[0]->{array}[0] } ),
+    '$.long_hash.key1'                              => single_ref( sub { $_[0]->{long_hash}{key1} } ),
+    '$..foo'                                        => sub {
         my ( $refs, $obj ) = @_;
         for ( 0 .. $#{$refs} ) {
             my $ref      = $refs->[$_];
@@ -101,6 +46,45 @@ my @EXPRESSIONS = (
             else {
                 is $obj->{long_hash}{key1}{subkey2}, $expected, q{Value for 'subkey2' OK};
             }
+        }
+    },
+    '$.complex_array[?(@.quux)]' => sub {
+        my ( $refs, $obj ) = @_;
+
+        my @indices = grep { $obj->{complex_array}[$_]{quux} } ( 0 .. $#{ $obj->{complex_array} } );
+        for ( 0 .. $#{$refs} ) {
+            my $ref      = $refs->[$_];
+            my $expected = int rand 1000;
+            ${$ref} = $expected;
+            is $obj->{complex_array}[ $indices[$_] ], $expected, q{Value OK};
+        }
+    },
+    '$.nonexistent' => sub {
+        my ( $refs, $obj ) = @_;
+        ok exists $obj->{nonexistent}, 'want_ref creates the key';
+    },
+    '$..nonexistent' => sub {
+        my ( $refs, $obj ) = @_;
+        is scalar @{$refs}, 0, 'Nonexistent recursive path gives nothing back';
+    },
+    '$.array[0,1]' => sub {
+        my ( $refs, $obj ) = @_;
+        for ( 0 .. $#{$refs} ) {
+            my $ref      = $refs->[$_];
+            my $expected = int rand 1000;
+            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
+            ${$ref} = $expected;
+            is $obj->{array}[$_], $expected, qq{Value $_ OK};
+        }
+    },
+    '$.array[1:3]' => sub {
+        my ( $refs, $obj ) = @_;
+        for ( 0 .. $#{$refs} ) {
+            my $ref      = $refs->[$_];
+            my $expected = int rand 1000;
+            is ref $ref, 'SCALAR', qq{Reftype $_ OK};
+            ${$ref} = $expected;
+            is $obj->{array}[ $_ + 1 ], $expected, qq{Value $_ OK};
         }
     },
 );
