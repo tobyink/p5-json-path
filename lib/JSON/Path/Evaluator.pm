@@ -309,8 +309,6 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
             my (@got) = _get( $obj, $index, create_key => $want_ref );    # This always returns a ref
             if ( !@{$token_stream} ) {
-                return undef if !@got;
-
                 return $want_ref ? @got : map { ${$_} } @got;
             }
             else {
@@ -568,7 +566,10 @@ sub _process_pseudo_js {
         @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
     }
     else {
-        @lhs = map { $self->_evaluate( $_, [@token_stream] ) } @{$object};
+        for my $value (@{$object}) {
+            my ($got) = $self->_evaluate($value, [@token_stream]);
+            push @lhs, $got;
+        }
     }
 
     # get indexes that pass compare()

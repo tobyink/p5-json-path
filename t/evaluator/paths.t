@@ -26,7 +26,7 @@ subtest filter => sub {
 
 subtest simple => sub {
     my @expressions = (
-        '$.nonexistent'               => [ undef ],
+        '$.nonexistent'               => [ ],
         '$.simple'                    => [ $data{simple} ],
         '$.long_hash.key1.subkey2'    => [ $data{long_hash}{key1}{subkey2} ],
         '$.long_hash.key1'            => [ dclone $data{long_hash}{key1} ],
