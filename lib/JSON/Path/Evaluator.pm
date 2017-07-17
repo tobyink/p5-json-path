@@ -229,7 +229,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
             assert( !$OPERATORS{$index}, qq{"$index" is not an operator} ) if $index ne $TOKEN_ALL;
             assert( !ref $index,         q{Index is a scalar} )            if $ASSERT_ENABLE;
 
-            my (@got) = _get( $obj, $index );    # This always returns a ref
+            my (@got) = _get( $obj, $index, create_key => $want_ref );    # This always returns a ref
             if ( !@{$token_stream} ) {
                 return $want_ref ? @got : map { ${$_} } @got;
             }
@@ -266,9 +266,11 @@ sub _process_filter {
 # I.E.: for { foo => 'bar' }, we always want \( foo->{bar} ) so that
 # JSON::Path->new('$.foo')->value($obj) = 'baz' works  like it oughtta.
 sub _get {
-    my ( $object, $index ) = @_;
+    my ( $object, $index, %args ) = @_;
 
     assert( _hashlike($object) || _arraylike($object), 'Object is a hashref or an arrayref' ) if $ASSERT_ENABLE;
+
+    my $create_key = $args{create_key};
 
     # When want_ref is passed to _evaluate(), it will return a reference to whatever was matched.
     # If what was matched is itself a ref (e.g. an arrayref), _evaluate() will return a ref of
@@ -277,7 +279,6 @@ sub _get {
         $object = ${$object};
     }
 
-    my @ret;
     if ( $index eq $TOKEN_ALL ) {
         if ( _hashlike($object) ) {
             return map { \($_) } values %{$object};
@@ -300,11 +301,29 @@ sub _get {
         }
 
         if ( _hashlike($object) ) {
-            return map { \( $object->{$_} ) } @indices;
+            if ($create_key) {
+                return map { \( $object->{$_} ) } @indices;
+            }
+            else {
+                my @ret;
+                for my $index (@indices) {
+                    push @ret, \( $object->{$index} ) if exists $object->{$index};
+                }
+                return @ret;
+            }
         }
         else {
             no warnings qw/numeric/;
-            return map { \( $object->[$_] ) } @indices;
+            if ($create_key) {
+                return map { \( $object->[$_] ) } @indices;
+            }
+            else {
+                my @ret;
+                for my $index (@indices) {
+                    push @ret, \( $object->[$index] ) if exists $object->[$index];
+                }
+                return @ret;
+            }
             use warnings qw/numeric/;
         }
     }
