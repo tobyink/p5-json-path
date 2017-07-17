@@ -193,10 +193,12 @@ sub evaluate {
     my $json_object = $self->{root};
 
     my $token_stream = [ tokenize($expression) ];
+    shift @{$token_stream} if $token_stream->[0] eq $TOKEN_ROOT;
+    shift @{$token_stream} if $token_stream->[0] eq $TOKEN_CHILD;
 
     if ( $args{want_path} ) {
         my %reftable = $self->_reftable_walker($json_object);
-        my @refs = $self->_evaluate( $json_object, $token_stream, 1 );
+        my @refs = $self->_evaluate( $json_object, dclone $token_stream, 1 );
 
         my @paths;
         for my $ref (@refs) {
@@ -205,8 +207,6 @@ sub evaluate {
         }
         return @paths;
     }
-    shift @{$token_stream} if $token_stream->[0] eq $TOKEN_ROOT;
-    shift @{$token_stream} if $token_stream->[0] eq $TOKEN_CHILD;
 
     my @ret = $self->_evaluate( $json_object, $token_stream, $args{want_ref} );
     return wantarray ? @ret : $ret[0];
@@ -517,17 +517,6 @@ sub _process_pseudo_js {
 
     my $index;
 
-    # FIXME: I really need to return a normalized token stream from tokenize
-    # if ( $token_stream[-1] eq $TOKEN_SUBSCRIPT_CLOSE ) {
-    #     pop @token_stream;
-    #     $index = pop @token_stream;
-    #     my $opening_token = pop @token_stream;
-    #     assert $opening_token eq $TOKEN_SUBSCRIPT_OPEN if $ASSERT_ENABLE;
-    # }
-    # else {
-    #     $index = pop @token_stream;
-    # }
-
     my @lhs;
     if ( _hashlike($object) ) {
         @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
@@ -626,11 +615,21 @@ sub _process_perl {
     ${ $cpt->varglob('root') } = dclone( $self->{root} );
 
     my @matching;
-    for my $index ( 0 .. $#{$object} ) {
-        local $_ = $object->[$index];
-        my $ret = $cpt->reval($code);
-        croak qq{Error in filter: $@} if $@;
-        push @matching, $index if $cpt->reval($code);
+    if ( _hashlike($object) ) {
+        for my $index ( keys %{$object} ) {
+            local $_ = $object->{$index};
+            my $ret = $cpt->reval($code);
+            croak qq{Error in filter: $@} if $@;
+            push @matching, $index if $ret;
+        }
+    }
+    else {
+        for my $index ( 0 .. $#{$object} ) {
+            local $_ = $object->[$index];
+            my $ret = $cpt->reval($code);
+            croak qq{Error in filter: $@} if $@;
+            push @matching, $index if $ret;
+        }
     }
     return @matching;
 }

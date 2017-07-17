@@ -1,6 +1,7 @@
-use Test2::V0 '-target' => 'JSON::Path::Evaluator';
-
-plan skip_all => 'this will fail';
+use Test2::V0 '-target' => 'JSON::Path';
+# Test demonstrating RT #122109, "paths method succeeds in search but then fails on path construction"
+# https://rt.cpan.org/Ticket/Display.html?id=122109
+#
 
 my $json='{
    "4" : {
