@@ -36,10 +36,11 @@ my $json = q({
 my $obj = decode_json($json);
 
 my @expressions = (
-    '$.store.book.0.price'                                => '$.store.book[0].price',
-    '$.store.book[?($_->{author} eq "J. R. R. Tolkien")]' => '$.store.book[3]',
-    '$.store.book[?($_->{category} eq "fiction")]' => [ '$.store.book[1]', '$.store.book[2]', '$.store.book[3]' ],
-#    '$..[?(@.price > 10)]' => [ '$.store.book[1]', '$.store.book[3]' ], # TODO
+    q{$..[?(@.price > 10)]} => [ q{$['store']['book']['1']}, q{$['store']['book']['3']}, ],
+    q{$.store.book.0.price}                                => q{$['store']['book']['0']['price']},
+    q{$.store.book[?($_->{author} eq "J. R. R. Tolkien")]} => q{$['store']['book']['3']},
+    q{$.store.book[?($_->{category} eq "fiction")]} =>
+        [ q{$['store']['book']['1']}, q{$['store']['book']['2']}, q{$['store']['book']['3']} ],
 );
 do_test(@expressions);
 done_testing;
@@ -58,4 +59,3 @@ sub do_test {
         };
     }
 }
-

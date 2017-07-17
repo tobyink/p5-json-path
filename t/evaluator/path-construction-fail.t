@@ -49,5 +49,5 @@ my $json_hash = parse_json($json);
 my $p3        = $CLASS->new('$.[?($_->{name} eq "Email")]');
 my @paths;
 ok lives { @paths = $p3->paths($json_hash) }, q{paths() did not die} or diag qq{Caught exception: $@};
-is \@paths, ['$.5'], q{paths() produced correct path};
+is \@paths, [q{$['5']}], q{paths() produced correct path};
 done_testing;

@@ -94,7 +94,10 @@ sub new {
     }
     $self->{want_ref}         = $args{want_ref}         || 0;
     $self->{_calling_context} = $args{_calling_context} || 0;
-    $self->{script_engine}    = $args{script_engine}    || 'PseudoJS';
+
+    my $script_engine =
+        $args{script_engine} ? $args{script_engine} : $self->{expression} =~ /\$_/ ? 'perl' : undef;
+    $self->{script_engine} = $script_engine || 'PseudoJS';
     bless $self, $class;
     return $self;
 }
@@ -141,11 +144,9 @@ sub evaluate_jsonpath {
     my $want_ref  = delete $args{want_ref}  || 0;
     my $want_path = delete $args{want_path} || 0;
 
-    my $script_engine = delete $args{script_engine} ? $args{script_engine} : $expression =~ /\$_/ ? 'perl' : undef;
     my $self = __PACKAGE__->new(
         root             => $json_object,
         expression       => $expression,
-        script_engine    => $script_engine,
         _calling_context => wantarray ? 'ARRAY' : 'SCALAR',
         %args
     );
@@ -222,7 +223,7 @@ sub _reftable_walker {
 
     if ( ref $json_object eq 'ARRAY' ) {
         for ( 0 .. $#{$json_object} ) {
-            my $path = sprintf '%s[%d]', $base_path, $_;
+            my $path = sprintf q{%s['%d']}, $base_path, $_;
             if ( ref $json_object->[$_] ) {
                 push @entries, $self->_reftable_walker( $json_object->[$_], $path );
             }
@@ -233,7 +234,7 @@ sub _reftable_walker {
     }
     else {
         for my $index ( keys %{$json_object} ) {
-            my $path = sprintf '%s.%s', $base_path, $index;
+            my $path = sprintf q{%s['%s']}, $base_path, $index;
             if ( ref $json_object->{$index} ) {
                 push @entries, $self->_reftable_walker( $json_object->{$index}, $path );
             }
@@ -248,6 +249,8 @@ sub _reftable_walker {
 sub _evaluate {    # This assumes that the token stream is syntactically valid
     my ( $self, $obj, $token_stream, $want_ref ) = @_;
 
+    return unless ref $obj;
+
     $token_stream ||= [];
 
     while ( defined( my $token = shift @{$token_stream} ) ) {
@@ -255,9 +258,13 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
         next if $token eq $TOKEN_CHILD;
 
         if ( $token eq $TOKEN_FILTER_OPEN ) {
+            my $filter_expression = shift @{$token_stream};
+
+            my $closing_token = shift @{$token_stream};
+            assert( $closing_token eq $TOKEN_FILTER_SCRIPT_CLOSE, q{Closing token seen} ) if $ASSERT_ENABLE;
 
             # Find all indices matching the filter expression. This modifies $token_stream
-            my @matching_indices = $self->_process_filter( $obj, $token_stream );
+            my @matching_indices = $self->_process_filter( $obj, $filter_expression );
 
             if ( !@{$token_stream} ) {
                 my @got = map { _get( $obj, $_ ) } @matching_indices;
@@ -270,12 +277,21 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
         elsif ( $token eq $TOKEN_RECURSIVE )
         {    # Sweet Jesus, Pooh, that's not honey! You're eating Sweet Jesus, Pooh, that's not honey! You're eating...
             my $index = shift @{$token_stream};
+            my @matched;
+            if ( $index eq $TOKEN_FILTER_OPEN ) {
+                my $filter_expression = shift @{$token_stream};
 
-            my $matched = [ _match_recursive( $obj, $index, $want_ref ) ];
-            if ( !@{$token_stream} ) {
-                return @{$matched};
+                my $closing_token = shift @{$token_stream};
+                assert( $closing_token eq $TOKEN_FILTER_SCRIPT_CLOSE, q{Closing token seen} ) if $ASSERT_ENABLE;
+
+                return $self->_filter_recursive( $obj, $filter_expression, $want_ref );
             }
-            return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @{$matched};
+
+            @matched = _match_recursive( $obj, $index, $want_ref );
+            if ( !@{$token_stream} ) {
+                return @matched;
+            }
+            return map { $self->_evaluate( $_, dclone($token_stream), $want_ref ) } @matched;
         }
         else {
             my $index;
@@ -293,6 +309,8 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
             my (@got) = _get( $obj, $index, create_key => $want_ref );    # This always returns a ref
             if ( !@{$token_stream} ) {
+                return undef if !@got;
+
                 return $want_ref ? @got : map { ${$_} } @got;
             }
             else {
@@ -303,11 +321,8 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 }
 
 sub _process_filter {
-    my ( $self, $obj, $token_stream ) = @_;
-    my $filter_expression = shift @{$token_stream};
+    my ( $self, $obj, $filter_expression ) = @_;
 
-    my $closing_token = shift @{$token_stream};
-    assert( $closing_token eq $TOKEN_FILTER_SCRIPT_CLOSE, q{Closing token seen} ) if $ASSERT_ENABLE;
     my @matching_indices;
     if ( $self->{script_engine} eq 'PseudoJS' ) {
         @matching_indices = $self->_process_pseudo_js( $obj, $filter_expression );
@@ -375,20 +390,24 @@ sub _get {
             }
         }
         else {
-            no warnings qw/numeric/;
+            my @numeric_indices = grep { looks_like_number($_) } @indices;
             if ($create_key) {
-                return map { \( $object->[$_] ) } @indices;
+                return map { \( $object->[$_] ) } @numeric_indices;
             }
             else {
                 my @ret;
-                for my $index (@indices) {
+                for my $index (@numeric_indices) {
                     push @ret, \( $object->[$index] ) if exists $object->[$index];
                 }
                 return @ret;
             }
-            use warnings qw/numeric/;
         }
     }
+}
+
+sub _indices {
+    my $object = shift;
+    return _hashlike($object) ? keys %{$object} : ( 0 .. $#{$object} );
 }
 
 sub _hashlike {
@@ -490,7 +509,11 @@ sub _match_recursive {
     my ( $obj, $index, $want_ref ) = @_;
 
     my @match;
+
     if ( _arraylike($obj) ) {
+        if ( looks_like_number($index) && exists $obj->[$index] ) {
+            push @match, $want_ref ? \( $obj->[$index] ) : $obj->[$index];
+        }
         for ( 0 .. $#{$obj} ) {
             next unless ref $obj->[$_];
             push @match, _match_recursive( $obj->[$_], $index, $want_ref );
@@ -506,6 +529,29 @@ sub _match_recursive {
         }
     }
     return @match;
+}
+
+sub _filter_recursive {
+    my ( $self, $obj, $expression, $want_ref ) = @_;
+
+    my @ret;
+
+    # Evaluate the filter expression for the current object
+    my @matching_indices = $self->_process_filter( $obj, $expression );
+    for my $index (@matching_indices) {
+        my ($got) = _get( $obj, $index );
+        push @ret, $want_ref ? $got : ${$got};
+    }
+
+    # Evaluate the filter expression for any subordinate objects
+    for my $index ( _indices($obj) ) {
+        my ($got) = _get( $obj, $index );
+        $got = ${$got};    # _get will always return a reference. We want the value, so dereference it
+        next unless ref $got;
+        push @ret, $self->_filter_recursive( $got, $expression, $want_ref );
+    }
+
+    return @ret;
 }
 
 sub _process_pseudo_js {
@@ -528,8 +574,6 @@ sub _process_pseudo_js {
     # get indexes that pass compare()
     my @matching;
     for ( 0 .. $#lhs ) {
-
-        #    my $val = _get( $lhs[$_], $index );
         my $val = $lhs[$_];
         push @matching, $_ if _compare( $operator, $val, $rhs );
     }
@@ -607,8 +651,6 @@ sub _normalize {
 
 sub _process_perl {
     my ( $self, $object, $code ) = @_;
-
-    assert( _arraylike($object), q{Object is an arrayref} ) if $ASSERT_ENABLE;
 
     my $cpt = Safe->new;
     $cpt->permit_only( ':base_core', qw/padsv padav padhv padany rv2gv/ );
