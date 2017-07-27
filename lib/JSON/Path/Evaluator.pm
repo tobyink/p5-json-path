@@ -508,6 +508,17 @@ sub _match_recursive {
 
     my @match;
 
+    # Fix for RT #122529.
+    #
+    # Consider the expression "$..foo..bar", evaluated with respect to the JSON "{"foo":{"bar":"baz"}}".
+    #
+    # The first term to be evaluated in the expression is "$..foo". If want_ref is passed to evaluate(),
+    # this will return a REF reference. In that case we must first dereference it to get the object that
+    # we will evaluate "..bar" with respect to.
+    if ( ref $obj eq 'REF' ) {
+        $obj = ${$obj};
+    }
+
     if ( _arraylike($obj) ) {
         if ( looks_like_number($index) && exists $obj->[$index] ) {
             push @match, $want_ref ? \( $obj->[$index] ) : $obj->[$index];
@@ -566,8 +577,8 @@ sub _process_pseudo_js {
         @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
     }
     else {
-        for my $value (@{$object}) {
-            my ($got) = $self->_evaluate($value, [@token_stream]);
+        for my $value ( @{$object} ) {
+            my ($got) = $self->_evaluate( $value, [@token_stream] );
             push @lhs, $got;
         }
     }
