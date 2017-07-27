@@ -4,7 +4,7 @@ JSON::Path
 
 # VERSION
 
-version 0.410
+version 0.411
 
 # SYNOPSIS
 
