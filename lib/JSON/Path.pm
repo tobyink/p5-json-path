@@ -111,7 +111,7 @@ sub map {
     my ( $self, $object, $coderef ) = @_;
     my $count;
     foreach my $path ( $self->paths( $object ) ) {
-        my $ref = JSON::Path::Evaluator::evaluate_jsonpath( $object, $path, want_ref => 1 );
+        my ($ref) = JSON::Path::Evaluator::evaluate_jsonpath( $object, $path, want_ref => 1 );
         ++$count;
         my $value = do {
             no warnings 'numeric';
