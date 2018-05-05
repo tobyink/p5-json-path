@@ -368,6 +368,8 @@ Kit Peters E<lt>popefelix@cpan.orgE<gt>
 
 =head1 CONTRIBUTORS
 
+Szymon Nieznański E<lt>s.nez@member.fsf.orgE<gt> 
+
 Kit Peters E<lt>popefelix@cpan.orgE<gt>
 
 Heiko Jansen E<lt>hjansen@cpan.orgE<gt>.

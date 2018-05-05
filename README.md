@@ -4,7 +4,7 @@ JSON::Path
 
 # VERSION
 
-version 0.411
+version 0.420
 
 # SYNOPSIS
 
@@ -228,6 +228,8 @@ Toby Inkster <tobyink@cpan.org>.
 Kit Peters <popefelix@cpan.org>
 
 # CONTRIBUTORS
+
+Szymon Nieznański <s.nez@member.fsf.org> 
 
 Kit Peters <popefelix@cpan.org>
 
