@@ -210,7 +210,7 @@ sub evaluate {
     }
 
     my @ret = $self->_evaluate( $json_object, $token_stream, $args{want_ref} );
-    return wantarray ? @ret : $ret[0];
+    return @ret;
 }
 
 sub _reftable_walker {
