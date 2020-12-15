@@ -216,8 +216,8 @@ sub evaluate {
 sub _reftable_walker {
     my ( $self, $json_object, $base_path ) = @_;
 
-    $base_path   ||= '$';
-    $json_object ||= $self->root;
+    $base_path   = defined $base_path   ? $base_path   : '$';
+    $json_object = defined $json_object ? $json_object : $self->root;
 
     my @entries = ( refaddr $json_object => $base_path );
 
@@ -251,7 +251,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
     return unless ref $obj;
 
-    $token_stream ||= [];
+    $token_stream = defined $token_stream ? $token_stream : [];
 
     while ( defined( my $token = shift @{$token_stream} ) ) {
         next if $token eq $TOKEN_CURRENT;
