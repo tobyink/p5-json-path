@@ -221,7 +221,7 @@ sub _reftable_walker {
 
     my @entries = ( refaddr $json_object => $base_path );
 
-    if ( ref $json_object eq 'ARRAY' ) {
+    if ( _arraylike($json_object) ) {
         for ( 0 .. $#{$json_object} ) {
             my $path = sprintf q{%s['%d']}, $base_path, $_;
             if ( ref $json_object->[$_] ) {
@@ -232,7 +232,7 @@ sub _reftable_walker {
             }
         }
     }
-    else {
+    elsif ( _hashlike($json_object) ) {
         for my $index ( keys %{$json_object} ) {
             my $path = sprintf q{%s['%s']}, $base_path, $index;
             if ( ref $json_object->{$index} ) {
@@ -405,7 +405,10 @@ sub _get {
 
 sub _indices {
     my $object = shift;
-    return _hashlike($object) ? keys %{$object} : ( 0 .. $#{$object} );
+    return
+          _hashlike($object)  ? keys %{$object}
+        : _arraylike($object) ? ( 0 .. $#{$object} )
+        : ();
 }
 
 sub _hashlike {
@@ -576,7 +579,7 @@ sub _process_pseudo_js {
     if ( _hashlike($object) ) {
         @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
     }
-    else {
+    elsif ( _arraylike($object) ) {
         for my $value ( @{$object} ) {
             my ($got) = $self->_evaluate( $value, [@token_stream] );
             push @lhs, $got;
