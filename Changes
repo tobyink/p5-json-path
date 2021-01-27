@@ -5,6 +5,10 @@
       Fixes RT #122529
       Thomas Helsel ++
 
+    - Non-array-like and non-hash-like refs work properly for paths and map.
+      Fixes RT #123381
+      Patrick Cronin++
+
     [ Other ]
     - Warnings at the calling line when attempting to set on a non-object via set() or value() as an lvalue
 

@@ -216,12 +216,12 @@ sub evaluate {
 sub _reftable_walker {
     my ( $self, $json_object, $base_path ) = @_;
 
-    $base_path   ||= '$';
-    $json_object ||= $self->root;
+    $base_path   = defined $base_path   ? $base_path   : '$';
+    $json_object = defined $json_object ? $json_object : $self->root;
 
     my @entries = ( refaddr $json_object => $base_path );
 
-    if ( ref $json_object eq 'ARRAY' ) {
+    if ( _arraylike($json_object) ) {
         for ( 0 .. $#{$json_object} ) {
             my $path = sprintf q{%s['%d']}, $base_path, $_;
             if ( ref $json_object->[$_] ) {
@@ -232,7 +232,7 @@ sub _reftable_walker {
             }
         }
     }
-    else {
+    elsif ( _hashlike($json_object) ) {
         for my $index ( keys %{$json_object} ) {
             my $path = sprintf q{%s['%s']}, $base_path, $index;
             if ( ref $json_object->{$index} ) {
@@ -251,7 +251,7 @@ sub _evaluate {    # This assumes that the token stream is syntactically valid
 
     return unless ref $obj;
 
-    $token_stream ||= [];
+    $token_stream = defined $token_stream ? $token_stream : [];
 
     while ( defined( my $token = shift @{$token_stream} ) ) {
         next if $token eq $TOKEN_CURRENT;
@@ -405,7 +405,10 @@ sub _get {
 
 sub _indices {
     my $object = shift;
-    return _hashlike($object) ? keys %{$object} : ( 0 .. $#{$object} );
+    return
+          _hashlike($object)  ? keys %{$object}
+        : _arraylike($object) ? ( 0 .. $#{$object} )
+        : ();
 }
 
 sub _hashlike {
@@ -576,7 +579,7 @@ sub _process_pseudo_js {
     if ( _hashlike($object) ) {
         @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
     }
-    else {
+    elsif ( _arraylike($object) ) {
         for my $value ( @{$object} ) {
             my ($got) = $self->_evaluate( $value, [@token_stream] );
             push @lhs, $got;

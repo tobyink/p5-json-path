@@ -237,6 +237,8 @@ Heiko Jansen <hjansen@cpan.org>.
 
 Mitsuhiro Nakamura <m.nacamura@gmail.com>
 
+Patrick Cronin <oshihuna@gmail.com>
+
 # COPYRIGHT AND LICENCE
 
 Copyright 2007 Stefan Goessner.
