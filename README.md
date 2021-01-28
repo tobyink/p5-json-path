@@ -4,7 +4,7 @@ JSON::Path
 
 # VERSION
 
-version 0.420
+version 0.430
 
 # SYNOPSIS
 
@@ -269,11 +269,11 @@ THE SOFTWARE.
 
 # AUTHOR
 
-Kit Peters <kit.peters@broadbean.com>
+Kit Peters <popefelix@gmail.com>
 
 # COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2016 by Kit Peters.
+This software is copyright (c) 2021 by Kit Peters.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
