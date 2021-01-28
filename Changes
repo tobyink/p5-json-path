@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+0.430     2021-01-27 23:34:50-06:00 America/Chicago
+
     [ Bug Fixes ]
     - multiple recursion (e.g. $..foo..bar) works properly.
       Fixes RT #122529
