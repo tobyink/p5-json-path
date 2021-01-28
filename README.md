@@ -210,12 +210,12 @@ Specification: [http://goessner.net/articles/JsonPath/](http://goessner.net/arti
 Implementations in PHP, Javascript and C#:
 [http://code.google.com/p/jsonpath/](http://code.google.com/p/jsonpath/).
 
-Related modules: [JSON](https://metacpan.org/pod/JSON), [JSON::JOM](https://metacpan.org/pod/JSON::JOM), [JSON::T](https://metacpan.org/pod/JSON::T), [JSON::GRDDL](https://metacpan.org/pod/JSON::GRDDL),
-[JSON::Hyper](https://metacpan.org/pod/JSON::Hyper), [JSON::Schema](https://metacpan.org/pod/JSON::Schema).
+Related modules: [JSON](https://metacpan.org/pod/JSON), [JSON::JOM](https://metacpan.org/pod/JSON%3A%3AJOM), [JSON::T](https://metacpan.org/pod/JSON%3A%3AT), [JSON::GRDDL](https://metacpan.org/pod/JSON%3A%3AGRDDL),
+[JSON::Hyper](https://metacpan.org/pod/JSON%3A%3AHyper), [JSON::Schema](https://metacpan.org/pod/JSON%3A%3ASchema).
 
-Similar functionality: [Data::Path](https://metacpan.org/pod/Data::Path), [Data::DPath](https://metacpan.org/pod/Data::DPath), [Data::SPath](https://metacpan.org/pod/Data::SPath),
-[Hash::Path](https://metacpan.org/pod/Hash::Path), [Path::Resolver::Resolver::Hash](https://metacpan.org/pod/Path::Resolver::Resolver::Hash), [Data::Nested](https://metacpan.org/pod/Data::Nested),
-[Data::Hierarchy](https://metacpan.org/pod/Data::Hierarchy)... yes, the idea's not especially new. What's different
+Similar functionality: [Data::Path](https://metacpan.org/pod/Data%3A%3APath), [Data::DPath](https://metacpan.org/pod/Data%3A%3ADPath), [Data::SPath](https://metacpan.org/pod/Data%3A%3ASPath),
+[Hash::Path](https://metacpan.org/pod/Hash%3A%3APath), [Path::Resolver::Resolver::Hash](https://metacpan.org/pod/Path%3A%3AResolver%3A%3AResolver%3A%3AHash), [Data::Nested](https://metacpan.org/pod/Data%3A%3ANested),
+[Data::Hierarchy](https://metacpan.org/pod/Data%3A%3AHierarchy)... yes, the idea's not especially new. What's different
 is that JSON::Path uses a vaguely standardised syntax with implementations
 in at least three other programming languages.
 
@@ -236,8 +236,6 @@ Kit Peters <popefelix@cpan.org>
 Heiko Jansen <hjansen@cpan.org>.
 
 Mitsuhiro Nakamura <m.nacamura@gmail.com>
-
-Patrick Cronin <oshihuna@gmail.com>
 
 # COPYRIGHT AND LICENCE
 
