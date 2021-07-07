@@ -12,7 +12,7 @@ use Exporter::Tiny ();
 use JSON::MaybeXS;
 use JSON::Path::Constants qw(:operators :symbols);
 use JSON::Path::Tokenizer qw(tokenize);
-use List::Util qw/pairs/;
+use List::Util qw/pairs uniq/;
 use Readonly;
 use Safe;
 use Scalar::Util qw/looks_like_number blessed refaddr/;
@@ -567,33 +567,44 @@ sub _filter_recursive {
 }
 
 sub _process_pseudo_js {
-    my ( $self, $object, $expression ) = @_;
+    my ( $self, $object, $expressions ) = @_;
 
-    my ( $lhs, $operator, $rhs ) = _parse_psuedojs_expression($expression);
+    my @expressions_or = split /\Q||\E/, $expressions;
+    my @matching_or;
 
-    my (@token_stream) = tokenize($lhs);
+    foreach my $expression (@expressions_or) {
+        my @expressions_and = split /\Q&&\E/, $expression;
+        my %matching_and;
 
-    my $index;
+        foreach my $expression (@expressions_and) {
 
-    my @lhs;
-    if ( _hashlike($object) ) {
-        @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
-    }
-    elsif ( _arraylike($object) ) {
-        for my $value ( @{$object} ) {
-            my ($got) = $self->_evaluate( $value, [@token_stream] );
-            push @lhs, $got;
+            my ( $lhs, $operator, $rhs ) = _parse_psuedojs_expression($expression);
+
+            my (@token_stream) = tokenize($lhs);
+
+            my @lhs;
+            if ( _hashlike($object) ) {
+                @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
+            }
+            elsif ( _arraylike($object) ) {
+                for my $value ( @{$object} ) {
+                    my ($got) = $self->_evaluate( $value, [@token_stream] );
+                    push @lhs, $got;
+                }
+            }
+
+            # get indexes that pass compare()
+            for ( 0 .. $#lhs ) {
+                my $val = $lhs[$_];
+                $matching_and{$_}++ if _compare( $operator, $val, $rhs );
+            }
+        }
+        while (my ($idx, $val) = each(%matching_and)) {
+            push @matching_or, $idx if ($val == @expressions_and);
         }
     }
 
-    # get indexes that pass compare()
-    my @matching;
-    for ( 0 .. $#lhs ) {
-        my $val = $lhs[$_];
-        push @matching, $_ if _compare( $operator, $val, $rhs );
-    }
-
-    return @matching;
+    return sort(uniq(@matching_or));
 }
 
 sub _parse_psuedojs_expression {
