@@ -22,8 +22,8 @@ terms as Perl itself.
 use Test::More;
 BEGIN { use_ok('JSON::Path') }
 
-use JSON;
-my $object = from_json(<<'JSON');
+use JSON::MaybeXS;
+my $object = decode_json(<<'JSON');
 {
 	"store": {
 		"book": [
