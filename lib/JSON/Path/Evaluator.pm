@@ -17,7 +17,6 @@ use Readonly;
 use Safe;
 use Scalar::Util qw/looks_like_number blessed refaddr/;
 use Storable qw/dclone/;
-use Sys::Hostname qw/hostname/;
 use Try::Tiny;
 
 # VERSION
