@@ -8,7 +8,6 @@ use 5.008;
 
 use Carp;
 use Carp::Assert qw(assert);
-use Exporter::Tiny ();
 use JSON::MaybeXS;
 use JSON::Path::Constants qw(:operators :symbols);
 use JSON::Path::Tokenizer qw(tokenize);
@@ -21,9 +20,8 @@ use Sys::Hostname qw/hostname/;
 use Try::Tiny;
 
 # VERSION
-use base q(Exporter);
+use Exporter::Shiny qw/evaluate_jsonpath/;
 our $AUTHORITY = 'cpan:POPEFELIX';
-our @EXPORT_OK = qw/ evaluate_jsonpath /;
 
 Readonly my $OPERATOR_IS_TRUE         => 'IS_TRUE';
 Readonly my $OPERATOR_TYPE_PATH       => 1;
@@ -902,4 +900,3 @@ instead.
 =end :list
 
 =cut
-

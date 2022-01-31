@@ -7,7 +7,7 @@ use 5.008;
 use Carp;
 use Readonly;
 use JSON::Path::Constants qw(:symbols :operators);
-use Exporter::Easy ( OK => ['tokenize'] );
+use Exporter::Shiny 'tokenize';
 
 Readonly my $ESCAPE_CHAR      => qq{\\};
 Readonly my %OPERATORS => (
