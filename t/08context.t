@@ -1,8 +1,8 @@
 use Test::More;
 use JSON::Path;
-use JSON;
+use JSON::MaybeXS;
 
-my $object = from_json(<<'JSON');
+my $object = decode_json(<<'JSON');
 {
     "elements": [
         { "id": 1 },

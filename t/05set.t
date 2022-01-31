@@ -26,8 +26,8 @@ use warnings;
 use Test::More;
 use JSON::Path -all;
 
-use JSON;
-my $object = from_json(<<'JSON');
+use JSON::MaybeXS;
+my $object = decode_json(<<'JSON');
 {
 	"store": {
 		"book": [
