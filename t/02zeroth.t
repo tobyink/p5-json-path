@@ -21,8 +21,7 @@ terms as Perl itself.
 
 =cut
 
-use Test::More tests => 6;
-BEGIN { use_ok('JSON::Path') }
+use Test2::V0 '-target' => 'JSON::Path';
 
 use JSON::MaybeXS;
 my $object = {    #
@@ -49,3 +48,5 @@ my $jpath4  = JSON::Path->new('$.foo[-1:]');
 my @values4 = $jpath4->values( encode_json($object) );
 is( scalar @values4,    1, 'Returned one result.' );
 is( $values4[0]->{bar}, 3, 'Correct result.' );
+
+done_testing;
