@@ -10,29 +10,29 @@ package JSON::Path::Constants;
 
 use Readonly;
 
-use Exporter::Easy (
-    TAGS => [
-        symbols => [
-            '$DOLLAR_SIGN',          '$COMMERCIAL_AT',     '$FULL_STOP',      '$LEFT_SQUARE_BRACKET',
-            '$RIGHT_SQUARE_BRACKET', '$ASTERISK',          '$COLON',          '$LEFT_PARENTHESIS',
-            '$RIGHT_PARENTHESIS',    '$COMMA',             '$QUESTION_MARK',  '$EQUAL_SIGN',
-            '$EXCLAMATION_MARK',     '$GREATER_THAN_SIGN', '$LESS_THAN_SIGN', '$QUOTATION_MARK',
-            '$APOSTROPHE'
-        ],
-        operators => [
-            '$TOKEN_ROOT',           '$TOKEN_CURRENT',
-            '$TOKEN_CHILD',          '$TOKEN_RECURSIVE',
-            '$TOKEN_ALL',            '$TOKEN_FILTER_OPEN',
-            '$TOKEN_SCRIPT_OPEN',    '$TOKEN_FILTER_SCRIPT_CLOSE',
-            '$TOKEN_SUBSCRIPT_OPEN', '$TOKEN_SUBSCRIPT_CLOSE',
-            '$TOKEN_UNION',          '$TOKEN_ARRAY_SLICE',
-            '$TOKEN_SINGLE_EQUAL',   '$TOKEN_DOUBLE_EQUAL',
-            '$TOKEN_TRIPLE_EQUAL',   '$TOKEN_GREATER_THAN',
-            '$TOKEN_LESS_THAN',      '$TOKEN_NOT_EQUAL',
-            '$TOKEN_GREATER_EQUAL',  '$TOKEN_LESS_EQUAL',
-        ],
-    ]
+use Exporter::Shiny;
+our %EXPORT_TAGS = (
+    symbols => [
+        '$DOLLAR_SIGN',          '$COMMERCIAL_AT',     '$FULL_STOP',      '$LEFT_SQUARE_BRACKET',
+        '$RIGHT_SQUARE_BRACKET', '$ASTERISK',          '$COLON',          '$LEFT_PARENTHESIS',
+        '$RIGHT_PARENTHESIS',    '$COMMA',             '$QUESTION_MARK',  '$EQUAL_SIGN',
+        '$EXCLAMATION_MARK',     '$GREATER_THAN_SIGN', '$LESS_THAN_SIGN', '$QUOTATION_MARK',
+        '$APOSTROPHE'
+    ],
+    operators => [
+        '$TOKEN_ROOT',           '$TOKEN_CURRENT',
+        '$TOKEN_CHILD',          '$TOKEN_RECURSIVE',
+        '$TOKEN_ALL',            '$TOKEN_FILTER_OPEN',
+        '$TOKEN_SCRIPT_OPEN',    '$TOKEN_FILTER_SCRIPT_CLOSE',
+        '$TOKEN_SUBSCRIPT_OPEN', '$TOKEN_SUBSCRIPT_CLOSE',
+        '$TOKEN_UNION',          '$TOKEN_ARRAY_SLICE',
+        '$TOKEN_SINGLE_EQUAL',   '$TOKEN_DOUBLE_EQUAL',
+        '$TOKEN_TRIPLE_EQUAL',   '$TOKEN_GREATER_THAN',
+        '$TOKEN_LESS_THAN',      '$TOKEN_NOT_EQUAL',
+        '$TOKEN_GREATER_EQUAL',  '$TOKEN_LESS_EQUAL',
+    ],
 );
+our @EXPORT_OK = map @$_, values %EXPORT_TAGS;
 
 Readonly our $QUOTATION_MARK       => q{"};
 Readonly our $APOSTROPHE           => q{'};
