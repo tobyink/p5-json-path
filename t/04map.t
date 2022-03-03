@@ -17,7 +17,7 @@ terms as Perl itself.
 
 =cut
 
-use Test::More;
+use Test2::V0;
 use JSON::Path -all;
 
 use JSON::MaybeXS;
@@ -65,15 +65,15 @@ my $path1 = '$.store.book[*].title';
 
 jpath_map { uc $_ } $object, '$.store.book[*].title';
 
-is_deeply( [ jpath1( $object, $path1 ) ], [ map uc, 'Sayings of the Century' ], );
+is( [ jpath1( $object, $path1 ) ], [ map uc, 'Sayings of the Century' ], );
 
-is_deeply(
+is(
     [ jpath( $object, $path1 ) ],
     [ map uc, 'Sayings of the Century', 'Sword of Honour', 'Moby Dick', 'The Lord of the Rings' ],
 );
 
 is( JSON::Path->new('$.store.book[*].author')->set( $object => 'Anon', 2 ), 2, );
 
-is_deeply( [ jpath( $object, '$.store.book[*].author' ) ], [ 'Anon', 'Anon', 'Herman Melville', 'J. R. R. Tolkien' ], );
+is( [ jpath( $object, '$.store.book[*].author' ) ], [ 'Anon', 'Anon', 'Herman Melville', 'J. R. R. Tolkien' ], );
 
 done_testing();

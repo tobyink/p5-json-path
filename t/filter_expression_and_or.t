@@ -5,7 +5,7 @@ within the filter part of the path.
 
 =cut
 
-use Test::More;
+use Test2::V0;
 use JSON::Path::Evaluator qw/evaluate_jsonpath/;
 
 my $json = q@{

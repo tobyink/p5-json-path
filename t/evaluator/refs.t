@@ -1,6 +1,5 @@
-use Test::Most;
+use Test2::V0 '-target' => 'JSON::Path::Evaluator';
 use Carp;
-use JSON::Path::Evaluator;
 use JSON::MaybeXS qw/decode_json/;
 
 no warnings qw/uninitialized/;
@@ -144,7 +143,7 @@ sub do_test {
 
     subtest $expression => sub {
         my @refs;
-        lives_ok { @refs = JSON::Path::Evaluator::evaluate_jsonpath( $obj, $expression, want_ref => 1 ) }
+        ok lives { @refs = JSON::Path::Evaluator::evaluate_jsonpath( $obj, $expression, want_ref => 1 ) },
         q{evaluate() did not die};
         $test->( \@refs, $obj );
     };
@@ -300,4 +299,3 @@ sub sample_json {
 END
     return $data;
 }
-
