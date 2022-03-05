@@ -2,7 +2,6 @@ package JSON::Path::Tokenizer;
 
 use strict;
 use warnings;
-use 5.008;
 
 use Carp;
 use Readonly;

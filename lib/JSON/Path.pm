@@ -1,8 +1,7 @@
-use 5.008;
+package JSON::Path;
+
 use strict;
 use warnings;
-
-package JSON::Path;
 
 # VERSION
 
