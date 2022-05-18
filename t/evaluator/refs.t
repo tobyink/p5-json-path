@@ -2,9 +2,7 @@ use Test2::V0 '-target' => 'JSON::Path::Evaluator';
 use Carp;
 use JSON::MaybeXS qw/decode_json/;
 
-no warnings qw/uninitialized/;
-my @tests_to_run = split /,/, $ARGV[0];
-use warnings qw/uninitialized/;
+my @tests_to_run = split /,/, $ARGV[0] // '';
 
 subtest recursive => sub {
     plan skip_all => 'This test not requested' if @tests_to_run && !grep { lc($_) eq 'recursive' } @tests_to_run;

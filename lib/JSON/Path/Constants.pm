@@ -1,8 +1,7 @@
+package JSON::Path::Constants;
+
 use strict;
 use warnings;
-use 5.008;
-
-package JSON::Path::Constants;
 
 # ABSTRACT: Constants used in the JSON::Path distribution
 
