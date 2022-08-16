@@ -1,5 +1,10 @@
 {{$NEXT}}
 
+    [ Bug Fixes ]
+    - Fix filtering using unary operators.
+    Fixes issue #34
+    David Escribano García++
+
     [ Other ]
     - No functional changes since 0.51, switch to semantic versioning.
 

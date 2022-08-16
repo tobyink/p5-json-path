@@ -575,6 +575,7 @@ sub _process_pseudo_js {
         foreach my $expression (@expressions_and) {
 
             my ( $lhs, $operator, $rhs ) = _parse_psuedojs_expression($expression);
+            $lhs =~ s/^\s+|\s+$//g;
 
             my (@token_stream) = tokenize($lhs);
 

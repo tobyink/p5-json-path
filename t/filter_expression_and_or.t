@@ -77,6 +77,9 @@ is(@data, 2, 'Got "Marketing" and "Something Else"');
 @data = evaluate_jsonpath($json, '$.Competency[?(@.level==500 && @.name=="Marketing" || @.level==75 && @.name="Something Else")].name');
 is(@data, 0, 'Got Nothing');
 
+@data = evaluate_jsonpath($json, '$.Competency[?(@.name && @.level )]');
+is(@data, 2, 'LHS Trimmed when necessary');
+
 SKIP: {
     skip "Not working on AND/OR naive and quick implementation";
     @data = evaluate_jsonpath($json, '$.Competency[?(@.level>1000 || @.level>200 || @.name!="Ben && Jerry")].name');
