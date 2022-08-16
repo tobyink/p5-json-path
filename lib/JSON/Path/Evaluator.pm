@@ -579,21 +579,21 @@ sub _process_pseudo_js {
 
             my (@token_stream) = tokenize($lhs);
 
-            my @lhs;
             if ( _hashlike($object) ) {
-                @lhs = map { $self->_evaluate( $_, [@token_stream] ) } values %{$object};
-            }
-            elsif ( _arraylike($object) ) {
-                for my $value ( @{$object} ) {
-                    my ($got) = $self->_evaluate( $value, [@token_stream] );
-                    push @lhs, $got;
+                while (my ($k, $v) = each(%$object)) {
+                  my @got = $self->_evaluate( $v, [@token_stream] );
+                  foreach my $got (@got) {
+                      $matching_and{$k}++ if _compare( $operator, $got, $rhs );
+                  }
                 }
             }
-
-            # get indexes that pass compare()
-            for ( 0 .. $#lhs ) {
-                my $val = $lhs[$_];
-                $matching_and{$_}++ if _compare( $operator, $val, $rhs );
+            elsif ( _arraylike($object) ) {
+                my $idx = 0;
+                for my $value ( @{$object} ) {
+                    my ($got) = $self->_evaluate( $value, [@token_stream] );
+                    $matching_and{$idx}++ if _compare( $operator, $got, $rhs );
+                    $idx++;
+                }
             }
         }
         while (my ($idx, $val) = each(%matching_and)) {
