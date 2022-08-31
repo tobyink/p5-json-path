@@ -372,6 +372,8 @@ Heiko Jansen E<lt>hjansen@cpan.orgE<gt>.
 
 Mitsuhiro Nakamura E<lt>m.nacamura@gmail.comE<gt>
 
+David Escribano García https://github.com/DavidEGx
+
 =head1 COPYRIGHT AND LICENCE
 
 Copyright 2007 Stefan Goessner.

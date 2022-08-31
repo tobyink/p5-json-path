@@ -4,7 +4,7 @@ JSON::Path
 
 # VERSION
 
-version 0.430
+version 1.0.1
 
 # SYNOPSIS
 
@@ -237,6 +237,8 @@ Heiko Jansen <hjansen@cpan.org>.
 
 Mitsuhiro Nakamura <m.nacamura@gmail.com>
 
+David Escribano García https://github.com/DavidEGx
+
 # COPYRIGHT AND LICENCE
 
 Copyright 2007 Stefan Goessner.
@@ -273,7 +275,7 @@ Kit Peters <popefelix@gmail.com>
 
 # COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2021 by Kit Peters.
+This software is copyright (c) 2022 by Kit Peters.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
